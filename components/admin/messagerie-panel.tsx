@@ -118,7 +118,6 @@ export function MessageriePanel() {
       }
 
       setActionSuccess("Réservation mise à jour")
-
       setSelectedConversation((prev) => (prev ? { ...prev, statut: data.statut } : prev))
       setActionMessage("")
       setActionAttachments([])

@@ -54,14 +54,16 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Erreur lors de l\'envoi du message:', error)
+      console.error("Erreur lors de l'envoi du message:", error)
       return NextResponse.json(
-        { error: 'Erreur lors de l\'envoi du message' },
+        { error: "Erreur lors de l'envoi du message" },
         { status: 500 }
       )
     }
 
     // Envoyer un email au client lorsqu'un administrateur répond
+    let emailNotification: 'sent' | 'skipped' | 'failed' | null = null
+
     if (body.expediteur_type === 'admin') {
       const { data: reservation, error: reservationError } = await supabaseAdmin
         .from('reservations')
@@ -71,42 +73,45 @@ export async function POST(request: NextRequest) {
 
       if (reservationError || !reservation) {
         console.error('Reservation introuvable pour notification email:', reservationError)
-        return NextResponse.json(
-          { error: "Impossible d'envoyer l'email au client (réservation introuvable)" },
-          { status: 500 }
-        )
-      }
-
-      if (!isResendConfigured) {
-        return NextResponse.json(
-          { error: "Service d'email non configuré (RESEND_API_KEY manquant)" },
-          { status: 500 }
-        )
-      }
-
-      try {
-        await resend.emails.send({
-          from: FROM_EMAIL,
-          to: reservation.client_email,
-          subject: `Nouveau message concernant ${reservation.animal_nom}`,
-          html: `
-            <p>Bonjour ${reservation.client_prenom ? `${reservation.client_prenom} ${reservation.client_nom}` : reservation.client_nom},</p>
+        emailNotification = 'skipped'
+      } else if (!isResendConfigured) {
+        console.warn("Notification email ignorée: RESEND_API_KEY manquant")
+        emailNotification = 'skipped'
+      } else {
+        try {
+          await resend.emails.send({
+            from: FROM_EMAIL,
+            to: reservation.client_email,
+            subject: `Nouveau message concernant ${reservation.animal_nom}`,
+            html: `
+            <p>Bonjour ${
+              reservation.client_prenom
+                ? `${reservation.client_prenom} ${reservation.client_nom}`
+                : reservation.client_nom
+            },</p>
             <p>Vous avez reçu un nouveau message dans votre espace Les Petits Bergers :</p>
-            <blockquote style="border-left: 4px solid #000091; padding: 12px; margin: 16px 0; color: #1e1e1e;">${body.contenu}</blockquote>
+            <blockquote style="border-left: 4px solid #000091; padding: 12px; margin: 16px 0; color: #1e1e1e;">
+              ${body.contenu}
+            </blockquote>
             <p>Pour répondre ou suivre votre demande, utilisez votre code de réservation <strong>${reservation.code}</strong>.</p>
             <p>À très vite,<br>L'équipe Les Petits Bergers</p>
           `,
-        })
-      } catch (emailError) {
-        console.error("Echec d'envoi d'email messagerie:", emailError)
-        return NextResponse.json(
-          { error: "Le message a été enregistré mais l'email n'a pas pu être envoyé" },
-          { status: 500 }
-        )
+          })
+          emailNotification = 'sent'
+        } catch (emailError) {
+          console.error("Echec d'envoi d'email messagerie:", emailError)
+          emailNotification = 'failed'
+        }
       }
     }
 
-    return NextResponse.json(data, { status: 201 })
+    return NextResponse.json(
+      {
+        ...data,
+        emailNotification,
+      },
+      { status: 201 }
+    )
   } catch (error) {
     console.error('Erreur:', error)
     return NextResponse.json(

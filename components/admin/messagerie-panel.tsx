@@ -35,8 +35,14 @@ export function MessageriePanel() {
   const [loading, setLoading] = useState(true)
   const [sendingMessage, setSendingMessage] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null)
+  const [actionMessage, setActionMessage] = useState("")
+  const [actionAttachments, setActionAttachments] = useState<any[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const actionFileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Charger les conversations
@@ -85,6 +91,43 @@ export function MessageriePanel() {
       setMessages(data)
     } catch (err) {
       console.error('Erreur:', err)
+    }
+  }
+
+  const handleReservationAction = async (action: 'accepter' | 'refuser' | 'demander_infos') => {
+    if (!selectedConversation) return
+
+    try {
+      setUpdatingStatus(true)
+      setActionError(null)
+      const response = await fetch('/api/reservations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedConversation.reservationId,
+          action,
+          message: actionMessage || undefined,
+          piecesJointes: actionAttachments,
+        })
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Impossible de mettre a jour la reservation')
+      }
+
+      setActionSuccess('Reservation mise a jour')
+      setSelectedConversation(prev => prev ? { ...prev, statut: data.statut } : prev)
+      setActionMessage("")
+      setActionAttachments([])
+      await fetchMessages(selectedConversation.reservationId)
+      await fetchConversations()
+      setTimeout(() => setActionSuccess(null), 3000)
+    } catch (err) {
+      console.error('Erreur:', err)
+      setActionError(err instanceof Error ? err.message : 'Erreur inconnue')
+    } finally {
+      setUpdatingStatus(false)
     }
   }
 
@@ -184,6 +227,37 @@ export function MessageriePanel() {
     }
   }
 
+  const handleActionFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setUploadingFile(true)
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/messages/upload', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de l\'upload du fichier')
+      }
+
+      const data = await response.json()
+      setActionAttachments((prev) => [...prev, data])
+    } catch (err) {
+      console.error('Erreur:', err)
+      setActionError('Impossible d\'ajouter la piece jointe')
+    } finally {
+      setUploadingFile(false)
+      if (actionFileInputRef.current) {
+        actionFileInputRef.current.value = ''
+      }
+    }
+  }
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
     const now = new Date()
@@ -195,6 +269,18 @@ export function MessageriePanel() {
       return `Hier ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
     } else {
       return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    }
+  }
+
+  const renderStatutBadge = (statut: string) => {
+    switch (statut) {
+      case 'confirmee':
+        return <span className="fr-badge fr-badge--success fr-badge--no-icon">Confirmee</span>
+      case 'annulee':
+        return <span className="fr-badge fr-badge--error fr-badge--no-icon">Refusee</span>
+      case 'en_attente':
+      default:
+        return <span className="fr-badge fr-badge--info fr-badge--no-icon">En attente</span>
     }
   }
 
@@ -299,6 +385,96 @@ export function MessageriePanel() {
                     </div>
 
                     <hr className="fr-hr" />
+
+                    <div className="fr-grid-row fr-grid-row--gutters fr-mb-3w">
+                      <div className="fr-col-12 fr-col-md-4">
+                        <p className="fr-text--sm fr-mb-1v">Statut</p>
+                        {renderStatutBadge(selectedConversation.statut)}
+                      </div>
+                      <div className="fr-col-12 fr-col-md-8">
+                        <div className="fr-btns-group fr-btns-group--inline fr-btns-group--right">
+                          <button
+                            type="button"
+                            className="fr-btn fr-icon-check-line fr-btn--icon-left"
+                            onClick={() => handleReservationAction('accepter')}
+                            disabled={updatingStatus}
+                          >
+                            Accepter
+                          </button>
+                          <button
+                            type="button"
+                            className="fr-btn fr-btn--secondary fr-icon-close-line fr-btn--icon-left"
+                            onClick={() => handleReservationAction('refuser')}
+                            disabled={updatingStatus}
+                          >
+                            Refuser
+                          </button>
+                          <button
+                            type="button"
+                            className="fr-btn fr-btn--tertiary-no-outline fr-icon-mail-line fr-btn--icon-left"
+                            onClick={() => handleReservationAction('demander_infos')}
+                            disabled={updatingStatus}
+                          >
+                            Infos complementaires
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {actionError && (
+                      <div className="fr-alert fr-alert--error fr-mb-3w">
+                        <p>{actionError}</p>
+                      </div>
+                    )}
+
+                    {actionSuccess && (
+                      <div className="fr-alert fr-alert--success fr-mb-3w">
+                        <p>{actionSuccess}</p>
+                      </div>
+                    )}
+
+                    <div className="fr-grid-row fr-grid-row--gutters fr-mb-3w">
+                      <div className="fr-col-12 fr-col-md-8">
+                        <div className="fr-input-group">
+                          <label className="fr-label" htmlFor="action-message">
+                            Message au client (optionnel)
+                          </label>
+                          <textarea
+                            className="fr-input"
+                            id="action-message"
+                            rows={3}
+                            placeholder="Precisez les conditions ou les informations demandees"
+                            value={actionMessage}
+                            onChange={(e) => setActionMessage(e.target.value)}
+                            disabled={updatingStatus}
+                          />
+                        </div>
+                        {actionAttachments.length > 0 && (
+                          <ul className="fr-raw-list fr-text--sm fr-mb-2w">
+                            {actionAttachments.map((piece, idx) => (
+                              <li key={idx}>
+                                <span className="fr-icon-attachment-line fr-mr-1v" aria-hidden="true"></span>
+                                {piece.nom || piece.name || `Fichier ${idx + 1}`}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <div className="fr-upload-group">
+                          <label className="fr-label" htmlFor="action-piece-jointe">
+                            Ajouter une piece jointe (optionnel)
+                          </label>
+                          <input
+                            className="fr-upload"
+                            type="file"
+                            id="action-piece-jointe"
+                            ref={actionFileInputRef}
+                            onChange={handleActionFileUpload}
+                            disabled={updatingStatus || uploadingFile}
+                          />
+                          <p className="fr-hint-text">Utilisez cette option pour joindre un document lors d'une demande d'informations.</p>
+                        </div>
+                      </div>
+                    </div>
 
                     {/* Messages */}
                     <div className="fr-mb-3w" style={{ maxHeight: "400px", overflowY: "auto" }}>

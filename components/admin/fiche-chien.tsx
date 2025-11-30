@@ -1,108 +1,62 @@
 // components/admin/fiche-chien.tsx
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
-interface HistoriqueVisite {
+interface Proprietaire {
   id: string
-  date: string
-  type: "garde" | "comportementaliste"
-  duree: string
-  notes: string
-  montant: number
+  nom: string | null
+  prenom: string | null
+  email: string | null
+  telephone: string | null
+  adresse: string | null
+  ville: string | null
+  code_postal: string | null
+}
+
+interface Sociabilite {
+  chiens?: boolean
+  chats?: boolean
+  enfants?: boolean
+}
+
+interface Visite {
+  id: string
+  type: "garde" | "comportementaliste" | "visite_preventive" | "urgence"
+  date_debut: string
+  date_fin?: string | null
+  duree?: string | null
+  notes?: string | null
+  montant?: number | null
+  statut?: string | null
 }
 
 interface ChienDetails {
   id: string
   nom: string
   race: string
-  dateNaissance: string
-  sexe: string
-  sterilise: boolean
-  poids: number
-  couleur: string
-  puce: string
-  
-  proprietaire: {
-    nom: string
-    email: string
-    telephone: string
-    adresse: string
-  }
-  
-  veterinaire: {
-    nom: string
-    telephone: string
-    adresse: string
-  }
-  
-  sante: {
-    vaccins: string
-    allergies: string
-    traitements: string
-    antecedents: string
-  }
-  
-  comportement: {
-    caractere: string
-    sociabilite: string
-    peurs: string
-    alimentation: string
-    besoinsSpecifiques: string
-  }
-  
-  historique: HistoriqueVisite[]
-  
-  notes: string
-}
-
-const mockChienDetails: ChienDetails = {
-  id: "1",
-  nom: "Max",
-  race: "Berger Allemand",
-  dateNaissance: "2021-03-15",
-  sexe: "Male",
-  sterilise: true,
-  poids: 32,
-  couleur: "Noir et feu",
-  puce: "250269812345678",
-  
-  proprietaire: {
-    nom: "Jean Dupont",
-    email: "jean.dupont@email.com",
-    telephone: "06 12 34 56 78",
-    adresse: "123 rue de la Paix, 51000 Chalons-en-Champagne"
-  },
-  
-  veterinaire: {
-    nom: "Dr. Marie Leroy",
-    telephone: "03 26 12 34 56",
-    adresse: "45 avenue du General de Gaulle, 51000 Chalons-en-Champagne"
-  },
-  
-  sante: {
-    vaccins: "Rage, CHPPIL - Dernier rappel : 15/09/2025",
-    allergies: "Aucune connue",
-    traitements: "Antiparasitaire mensuel (Nexgard)",
-    antecedents: "Dysplasie legere hanche gauche diagnostiquee en 2023"
-  },
-  
-  comportement: {
-    caractere: "Joueur, affectueux, protecteur. Aime les longues promenades.",
-    sociabilite: "Tres sociable avec les humains. Selectif avec les autres chiens males.",
-    peurs: "Orages, feux d'artifice",
-    alimentation: "Croquettes Royal Canin German Shepherd - 400g/jour en 2 repas",
-    besoinsSpecifiques: "Necessite minimum 2h d'exercice par jour. Eviter les sauts importants (dysplasie)."
-  },
-  
-  historique: [
-    { id: "1", date: "2025-11-28", type: "garde", duree: "5 jours", notes: "Sejour sans probleme. Tres bon avec les autres pensionnaires.", montant: 175 },
-    { id: "2", date: "2025-10-15", type: "comportementaliste", duree: "1h30", notes: "Consultation pour reactivite envers les males. Exercices de desensibilisation.", montant: 60 },
-    { id: "3", date: "2025-09-20", type: "garde", duree: "3 jours", notes: "Leger stress le premier jour, puis adaptation rapide.", montant: 105 },
-    { id: "4", date: "2025-08-10", type: "garde", duree: "7 jours", notes: "Vacances des proprietaires. Excellent comportement.", montant: 245 },
-  ],
-  
-  notes: "Client fidele depuis 2022. Max est un chien equilibre qui s'adapte bien a l'environnement de garde. Prefere les jeux de balle aux jeux d'eau."
+  date_naissance?: string | null
+  age?: string | null
+  sexe?: string | null
+  poids?: number | null
+  couleur?: string | null
+  numero_puce?: string | null
+  numero_tatouage?: string | null
+  veterinaire_nom?: string | null
+  veterinaire_telephone?: string | null
+  veterinaire_adresse?: string | null
+  vaccins?: { nom?: string; date?: string; expiration?: string }[] | null
+  allergies?: string[] | null
+  traitements_en_cours?: string[] | null
+  antecedents_medicaux?: string | null
+  caractere?: string[] | null
+  sociabilite?: Sociabilite | null
+  peurs?: string[] | null
+  regime_alimentaire?: string | null
+  besoins_specifiques?: string | null
+  notes?: string | null
+  proprietaire?: Proprietaire | null
+  visites?: Visite[] | null
 }
 
 interface FicheChienProps {
@@ -113,9 +67,42 @@ interface FicheChienProps {
 export function FicheChien({ chienId, onBack }: FicheChienProps) {
   const [activeTab, setActiveTab] = useState<"infos" | "sante" | "comportement" | "historique">("infos")
   const [isEditing, setIsEditing] = useState(false)
-  const [chien] = useState<ChienDetails>(mockChienDetails)
+  const [chien, setChien] = useState<ChienDetails | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const calculateAge = (dateNaissance: string) => {
+  useEffect(() => {
+    const fetchChien = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch(`/api/chiens/${chienId}`)
+        if (!response.ok) {
+          throw new Error("Impossible de charger la fiche du chien")
+        }
+        const data = await response.json()
+        setChien(data)
+        setError(null)
+      } catch (err) {
+        console.error(err)
+        setError(err instanceof Error ? err.message : "Erreur inconnue")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchChien()
+  }, [chienId])
+
+  const proprietaireLabel = useMemo(() => {
+    if (!chien?.proprietaire) return null
+    const { prenom, nom } = chien.proprietaire
+    if (!prenom && !nom) return null
+    return `${prenom || ""} ${nom || ""}`.trim()
+  }, [chien])
+
+  const calculAge = (dateNaissance?: string | null, age?: string | null) => {
+    if (age) return age
+    if (!dateNaissance) return "Age non renseigne"
     const birth = new Date(dateNaissance)
     const now = new Date()
     const years = now.getFullYear() - birth.getFullYear()
@@ -124,6 +111,27 @@ export function FicheChien({ chienId, onBack }: FicheChienProps) {
       return `${years - 1} ans et ${12 + months} mois`
     }
     return `${years} ans et ${months} mois`
+  }
+
+  if (loading) {
+    return (
+      <div className="fr-container fr-py-4w">
+        <p>Chargement de la fiche...</p>
+      </div>
+    )
+  }
+
+  if (error || !chien) {
+    return (
+      <div className="fr-container fr-py-4w">
+        <div className="fr-alert fr-alert--error fr-mb-3w">
+          <p>{error || "Impossible de charger la fiche"}</p>
+        </div>
+        <button className="fr-btn" onClick={onBack}>
+          Retour
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -141,7 +149,7 @@ export function FicheChien({ chienId, onBack }: FicheChienProps) {
             </li>
             <li>
               <span className="fr-breadcrumb__link" aria-current="page">
-                {chien.nom}
+                {chien.nom || "Fiche chien"}
               </span>
             </li>
           </ol>
@@ -156,7 +164,7 @@ export function FicheChien({ chienId, onBack }: FicheChienProps) {
               {chien.nom}
             </h1>
             <p className="fr-text--lead">
-              {chien.race} - {calculateAge(chien.dateNaissance)}
+              {chien.race} - {calculAge(chien.date_naissance, chien.age)}
             </p>
           </div>
           <div className="fr-col-auto">
@@ -231,7 +239,7 @@ export function FicheChien({ chienId, onBack }: FicheChienProps) {
           role="tabpanel"
         >
           <div className="fr-grid-row fr-grid-row--gutters">
-            <div className="fr-col-12 fr-col-md-6">
+          <div className="fr-col-12 fr-col-md-6">
               <div className="fr-card fr-card--no-border">
                 <div className="fr-card__body">
                   <div className="fr-card__content">
@@ -245,15 +253,19 @@ export function FicheChien({ chienId, onBack }: FicheChienProps) {
                       <dt className="fr-text--bold fr-mt-2w">Race</dt>
                       <dd>{chien.race}</dd>
                       <dt className="fr-text--bold fr-mt-2w">Date de naissance</dt>
-                      <dd>{new Date(chien.dateNaissance).toLocaleDateString("fr-FR")}</dd>
+                      <dd>
+                        {chien.date_naissance
+                          ? new Date(chien.date_naissance).toLocaleDateString("fr-FR")
+                          : "Non renseignee"}
+                      </dd>
                       <dt className="fr-text--bold fr-mt-2w">Sexe</dt>
-                      <dd>{chien.sexe} {chien.sterilise ? "(sterilise)" : "(non sterilise)"}</dd>
+                      <dd>{chien.sexe || "Non renseigne"}</dd>
                       <dt className="fr-text--bold fr-mt-2w">Poids</dt>
-                      <dd>{chien.poids} kg</dd>
+                      <dd>{chien.poids ? `${chien.poids} kg` : "Non renseigne"}</dd>
                       <dt className="fr-text--bold fr-mt-2w">Couleur</dt>
-                      <dd>{chien.couleur}</dd>
+                      <dd>{chien.couleur || "Non renseignee"}</dd>
                       <dt className="fr-text--bold fr-mt-2w">N° puce</dt>
-                      <dd>{chien.puce}</dd>
+                      <dd>{chien.numero_puce || "Non renseigne"}</dd>
                     </dl>
                   </div>
                 </div>
@@ -269,13 +281,27 @@ export function FicheChien({ chienId, onBack }: FicheChienProps) {
                     </h3>
                     <dl className="fr-my-0">
                       <dt className="fr-text--bold fr-mt-2w">Nom</dt>
-                      <dd>{chien.proprietaire.nom}</dd>
+                      <dd>{proprietaireLabel || "Non renseigne"}</dd>
                       <dt className="fr-text--bold fr-mt-2w">Email</dt>
-                      <dd><a href={`mailto:${chien.proprietaire.email}`}>{chien.proprietaire.email}</a></dd>
+                      <dd>
+                        {chien.proprietaire?.email ? (
+                          <a href={`mailto:${chien.proprietaire.email}`}>{chien.proprietaire.email}</a>
+                        ) : (
+                          "Non renseigne"
+                        )}
+                      </dd>
                       <dt className="fr-text--bold fr-mt-2w">Telephone</dt>
-                      <dd><a href={`tel:${chien.proprietaire.telephone.replace(/\s/g, "")}`}>{chien.proprietaire.telephone}</a></dd>
+                      <dd>
+                        {chien.proprietaire?.telephone ? (
+                          <a href={`tel:${chien.proprietaire.telephone.replace(/\s/g, "")}`}>
+                            {chien.proprietaire.telephone}
+                          </a>
+                        ) : (
+                          "Non renseigne"
+                        )}
+                      </dd>
                       <dt className="fr-text--bold fr-mt-2w">Adresse</dt>
-                      <dd>{chien.proprietaire.adresse}</dd>
+                      <dd>{chien.proprietaire?.adresse || "Non renseignee"}</dd>
                     </dl>
                   </div>
                 </div>
@@ -289,11 +315,19 @@ export function FicheChien({ chienId, onBack }: FicheChienProps) {
                     </h3>
                     <dl className="fr-my-0">
                       <dt className="fr-text--bold fr-mt-2w">Nom</dt>
-                      <dd>{chien.veterinaire.nom}</dd>
+                      <dd>{chien.veterinaire_nom || "Non renseigne"}</dd>
                       <dt className="fr-text--bold fr-mt-2w">Telephone</dt>
-                      <dd><a href={`tel:${chien.veterinaire.telephone.replace(/\s/g, "")}`}>{chien.veterinaire.telephone}</a></dd>
+                      <dd>
+                        {chien.veterinaire_telephone ? (
+                          <a href={`tel:${chien.veterinaire_telephone.replace(/\s/g, "")}`}>
+                            {chien.veterinaire_telephone}
+                          </a>
+                        ) : (
+                          "Non renseigne"
+                        )}
+                      </dd>
                       <dt className="fr-text--bold fr-mt-2w">Adresse</dt>
-                      <dd>{chien.veterinaire.adresse}</dd>
+                      <dd>{chien.veterinaire_adresse || "Non renseignee"}</dd>
                     </dl>
                   </div>
                 </div>
@@ -315,7 +349,19 @@ export function FicheChien({ chienId, onBack }: FicheChienProps) {
                   <span className="fr-icon-syringe-line fr-mr-1w" aria-hidden="true"></span>
                   Vaccinations
                 </h3>
-                <p>{chien.sante.vaccins}</p>
+                {chien.vaccins && chien.vaccins.length > 0 ? (
+                  <ul className="fr-raw-list fr-mb-0">
+                    {chien.vaccins.map((vaccin, idx) => (
+                      <li key={idx}>
+                        {vaccin.nom || "Vaccin"}
+                        {vaccin.date && ` - ${new Date(vaccin.date).toLocaleDateString("fr-FR")}`}
+                        {vaccin.expiration && ` (validite ${new Date(vaccin.expiration).toLocaleDateString("fr-FR")})`}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>Non renseignes</p>
+                )}
               </div>
             </div>
             <div className="fr-col-12 fr-col-md-6">
@@ -324,29 +370,45 @@ export function FicheChien({ chienId, onBack }: FicheChienProps) {
                   <span className="fr-icon-alert-line fr-mr-1w" aria-hidden="true"></span>
                   Allergies
                 </h3>
-                <p>{chien.sante.allergies}</p>
-</div>
-</div>
-<div className="fr-col-12 fr-col-md-6">
-<div className="fr-callout">
-<h3 className="fr-callout__title">
-<span className="fr-icon-medicine-bottle-line fr-mr-1w" aria-hidden="true"></span>
-Traitements en cours
-</h3>
-<p>{chien.sante.traitements}</p>
-</div>
-</div>
-<div className="fr-col-12 fr-col-md-6">
-<div className="fr-callout fr-callout--purple-glycine">
-<h3 className="fr-callout__title">
-<span className="fr-icon-file-text-line fr-mr-1w" aria-hidden="true"></span>
-Antecedents medicaux
-</h3>
-<p>{chien.sante.antecedents}</p>
-</div>
-</div>
-</div>
-</div>
+                {chien.allergies && chien.allergies.length > 0 ? (
+                  <ul className="fr-raw-list fr-mb-0">
+                    {chien.allergies.map((allergie, idx) => (
+                      <li key={idx}>{allergie}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>Aucune allergie renseignee</p>
+                )}
+              </div>
+            </div>
+            <div className="fr-col-12 fr-col-md-6">
+              <div className="fr-callout">
+                <h3 className="fr-callout__title">
+                  <span className="fr-icon-medicine-bottle-line fr-mr-1w" aria-hidden="true"></span>
+                  Traitements en cours
+                </h3>
+                {chien.traitements_en_cours && chien.traitements_en_cours.length > 0 ? (
+                  <ul className="fr-raw-list fr-mb-0">
+                    {chien.traitements_en_cours.map((traitement, idx) => (
+                      <li key={idx}>{traitement}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>Aucun traitement renseigne</p>
+                )}
+              </div>
+            </div>
+            <div className="fr-col-12 fr-col-md-6">
+              <div className="fr-callout fr-callout--purple-glycine">
+                <h3 className="fr-callout__title">
+                  <span className="fr-icon-file-text-line fr-mr-1w" aria-hidden="true"></span>
+                  Antecedents medicaux
+                </h3>
+                <p>{chien.antecedents_medicaux || "Non renseignes"}</p>
+              </div>
+            </div>
+          </div>
+        </div>
     {/* Panel Comportement */}
     <div 
       id="panel-comportement" 
@@ -359,19 +421,43 @@ Antecedents medicaux
             <span className="fr-icon-emotion-line fr-mr-1w" aria-hidden="true"></span>
             Caractere
           </h3>
-          <p>{chien.comportement.caractere}</p>
+          {chien.caractere && chien.caractere.length > 0 ? (
+            <ul className="fr-raw-list fr-mb-0">
+              {chien.caractere.map((c, idx) => (
+                <li key={idx}>{c}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>Non renseigne</p>
+          )}
         </div>
         <div className="fr-col-12 fr-col-md-6">
           <h3 className="fr-h5">
             <span className="fr-icon-team-line fr-mr-1w" aria-hidden="true"></span>
             Sociabilite
           </h3>
-          <p>{chien.comportement.sociabilite}</p>
+          {chien.sociabilite ? (
+            <ul className="fr-raw-list fr-mb-0">
+              <li>Chiens : {chien.sociabilite.chiens ? "Oui" : "A verifier"}</li>
+              <li>Chats : {chien.sociabilite.chats ? "Oui" : "A verifier"}</li>
+              <li>Enfants : {chien.sociabilite.enfants ? "Oui" : "A verifier"}</li>
+            </ul>
+          ) : (
+            <p>Non renseigne</p>
+          )}
         </div>
         <div className="fr-col-12 fr-col-md-6">
           <div className="fr-alert fr-alert--warning fr-mb-3w">
             <h3 className="fr-alert__title">Peurs / Sensibilites</h3>
-            <p>{chien.comportement.peurs}</p>
+            {chien.peurs && chien.peurs.length > 0 ? (
+              <ul className="fr-raw-list fr-mb-0">
+                {chien.peurs.map((peur, idx) => (
+                  <li key={idx}>{peur}</li>
+                ))}
+              </ul>
+            ) : (
+              <p>Non renseigne</p>
+            )}
           </div>
         </div>
         <div className="fr-col-12 fr-col-md-6">
@@ -379,12 +465,12 @@ Antecedents medicaux
             <span className="fr-icon-restaurant-line fr-mr-1w" aria-hidden="true"></span>
             Alimentation
           </h3>
-          <p>{chien.comportement.alimentation}</p>
+          <p>{chien.regime_alimentaire || "Non renseigne"}</p>
         </div>
         <div className="fr-col-12">
           <div className="fr-alert fr-alert--info">
             <h3 className="fr-alert__title">Besoins specifiques</h3>
-            <p>{chien.comportement.besoinsSpecifiques}</p>
+            <p>{chien.besoins_specifiques || "Non renseignes"}</p>
           </div>
         </div>
       </div>
@@ -395,7 +481,7 @@ Antecedents medicaux
           Notes personnelles
         </h3>
         <div className="fr-highlight">
-          <p>{chien.notes}</p>
+          <p>{chien.notes || "Aucune note pour le moment"}</p>
         </div>
       </div>
     </div>
@@ -420,17 +506,19 @@ Antecedents medicaux
             </tr>
           </thead>
           <tbody>
-            {chien.historique.map((visite) => (
+            {(chien.visites || []).map((visite) => (
               <tr key={visite.id}>
-                <td>{new Date(visite.date).toLocaleDateString("fr-FR")}</td>
+                <td>{new Date(visite.date_debut).toLocaleDateString("fr-FR")}</td>
                 <td>
-                  <span className={`fr-badge fr-badge--sm ${visite.type === "garde" ? "fr-badge--green-emeraude" : "fr-badge--purple-glycine"} fr-badge--no-icon`}>
+                  <span
+                    className={`fr-badge fr-badge--sm ${visite.type === "garde" ? "fr-badge--green-emeraude" : "fr-badge--purple-glycine"} fr-badge--no-icon`}
+                  >
                     {visite.type === "garde" ? "Garde" : "Comportementaliste"}
                   </span>
                 </td>
-                <td>{visite.duree}</td>
-                <td>{visite.notes}</td>
-                <td>{visite.montant} EUR</td>
+                <td>{visite.duree || "-"}</td>
+                <td>{visite.notes || "-"}</td>
+                <td>{visite.montant ? `${visite.montant} EUR` : "-"}</td>
                 <td>
                   <button className="fr-btn fr-btn--tertiary-no-outline fr-btn--sm fr-icon-eye-line" title="Voir les details">
                     Details
@@ -443,7 +531,7 @@ Antecedents medicaux
             <tr>
               <td colSpan={4} className="fr-text--right fr-text--bold">Total</td>
               <td className="fr-text--bold">
-                {chien.historique.reduce((acc, v) => acc + v.montant, 0)} EUR
+                {(chien.visites || []).reduce((acc, v) => acc + (v.montant || 0), 0)} EUR
               </td>
               <td></td>
             </tr>

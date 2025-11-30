@@ -54,9 +54,9 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Erreur lors de l\'envoi du message:', error)
+      console.error("Erreur lors de l'envoi du message:", error)
       return NextResponse.json(
-        { error: 'Erreur lors de l\'envoi du message' },
+        { error: "Erreur lors de l'envoi du message" },
         { status: 500 }
       )
     }

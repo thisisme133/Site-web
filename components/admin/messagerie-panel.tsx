@@ -67,16 +67,16 @@ export function MessageriePanel() {
   const fetchConversations = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/messages/conversations')
+      const response = await fetch("/api/messages/conversations")
       if (!response.ok) {
-        throw new Error('Erreur lors du chargement des conversations')
+        throw new Error("Erreur lors du chargement des conversations")
       }
       const data = await response.json()
       setConversations(data)
       setError(null)
     } catch (err) {
-      console.error('Erreur:', err)
-      setError('Impossible de charger les conversations')
+      console.error("Erreur:", err)
+      setError("Impossible de charger les conversations")
     } finally {
       setLoading(false)
     }
@@ -86,12 +86,49 @@ export function MessageriePanel() {
     try {
       const response = await fetch(`/api/messages?reservation_id=${reservationId}`)
       if (!response.ok) {
-        throw new Error('Erreur lors du chargement des messages')
+        throw new Error("Erreur lors du chargement des messages")
       }
       const data = await response.json()
       setMessages(data)
     } catch (err) {
-      console.error('Erreur:', err)
+      console.error("Erreur:", err)
+    }
+  }
+
+  const handleReservationAction = async (action: "accepter" | "refuser" | "demander_infos") => {
+    if (!selectedConversation) return
+
+    try {
+      setUpdatingStatus(true)
+      setActionError(null)
+      const response = await fetch("/api/reservations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selectedConversation.reservationId,
+          action,
+          message: actionMessage || undefined,
+          piecesJointes: actionAttachments,
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Impossible de mettre à jour la réservation")
+      }
+
+      setActionSuccess("Réservation mise à jour")
+      setSelectedConversation((prev) => (prev ? { ...prev, statut: data.statut } : prev))
+      setActionMessage("")
+      setActionAttachments([])
+      await fetchMessages(selectedConversation.reservationId)
+      await fetchConversations()
+      setTimeout(() => setActionSuccess(null), 3000)
+    } catch (err) {
+      console.error("Erreur:", err)
+      setActionError(err instanceof Error ? err.message : "Erreur inconnue")
+    } finally {
+      setUpdatingStatus(false)
     }
   }
 
@@ -134,15 +171,15 @@ export function MessageriePanel() {
 
   const markAsRead = async (conversationId: string) => {
     try {
-      await fetch('/api/messages/mark-read', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId })
+      await fetch("/api/messages/mark-read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId }),
       })
       // Rafraîchir les conversations pour mettre à jour les compteurs
       fetchConversations()
     } catch (err) {
-      console.error('Erreur marquer comme lu:', err)
+      console.error("Erreur marquer comme lu:", err)
     }
   }
 
@@ -152,20 +189,20 @@ export function MessageriePanel() {
 
     try {
       setSendingMessage(true)
-      const response = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversation_id: selectedConversation.conversationId,
           reservation_id: selectedConversation.reservationId,
-          expediteur_type: 'admin',
-          expediteur_nom: 'Admin',
+          expediteur_type: "admin",
+          expediteur_nom: "Admin",
           contenu: newMessage,
-        })
+        }),
       })
 
       if (!response.ok) {
-        throw new Error('Erreur lors de l\'envoi du message')
+        throw new Error("Erreur lors de l'envoi du message")
       }
 
       setNewMessage("")
@@ -173,8 +210,8 @@ export function MessageriePanel() {
       await fetchMessages(selectedConversation.reservationId)
       await fetchConversations()
     } catch (err) {
-      console.error('Erreur:', err)
-      alert('Impossible d\'envoyer le message')
+      console.error("Erreur:", err)
+      alert("Impossible d'envoyer le message")
     } finally {
       setSendingMessage(false)
     }
@@ -187,32 +224,32 @@ export function MessageriePanel() {
     try {
       setUploadingFile(true)
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append("file", file)
 
-      const response = await fetch('/api/messages/upload', {
-        method: 'POST',
-        body: formData
+      const response = await fetch("/api/messages/upload", {
+        method: "POST",
+        body: formData,
       })
 
       if (!response.ok) {
-        throw new Error('Erreur lors de l\'upload du fichier')
+        throw new Error("Erreur lors de l'upload du fichier")
       }
 
       const data = await response.json()
 
       // Ajouter le fichier comme message
       if (selectedConversation) {
-        await fetch('/api/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        await fetch("/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             conversation_id: selectedConversation.conversationId,
             reservation_id: selectedConversation.reservationId,
-            expediteur_type: 'admin',
-            expediteur_nom: 'Admin',
+            expediteur_type: "admin",
+            expediteur_nom: "Admin",
             contenu: `📎 Fichier joint: ${data.nom}`,
-            pieces_jointes: [data]
-          })
+            pieces_jointes: [data],
+          }),
         })
 
         await fetchMessages(selectedConversation.reservationId)
@@ -223,7 +260,38 @@ export function MessageriePanel() {
     } finally {
       setUploadingFile(false)
       if (fileInputRef.current) {
-        fileInputRef.current.value = ''
+        fileInputRef.current.value = ""
+      }
+    }
+  }
+
+  const handleActionFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setUploadingFile(true)
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const response = await fetch("/api/messages/upload", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de l'upload du fichier")
+      }
+
+      const data = await response.json()
+      setActionAttachments((prev) => [...prev, data])
+    } catch (err) {
+      console.error("Erreur:", err)
+      setActionError("Impossible d'ajouter la pièce jointe")
+    } finally {
+      setUploadingFile(false)
+      if (actionFileInputRef.current) {
+        actionFileInputRef.current.value = ""
       }
     }
   }
@@ -269,7 +337,12 @@ export function MessageriePanel() {
     } else if (diffDays === 1) {
       return `Hier ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
     } else {
-      return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+      return date.toLocaleDateString("fr-FR", {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
     }
   }
 
@@ -313,7 +386,7 @@ export function MessageriePanel() {
 
       {/* Indicateur de chargement */}
       {loading && (
-        <div className="fr-mb-4w" style={{ textAlign: 'center' }}>
+        <div className="fr-mb-4w" style={{ textAlign: "center" }}>
           <p>Chargement des conversations...</p>
         </div>
       )}
@@ -392,12 +465,16 @@ export function MessageriePanel() {
               <div className="fr-card fr-card--no-border">
                 <div className="fr-card__body">
                   <div className="fr-card__content">
-                    {/* En-tete */}
+                    {/* En-tête */}
                     <div className="fr-mb-3w">
                       <h3 className="fr-h5 fr-mb-1v">{selectedConversation.sujet}</h3>
                       <p className="fr-text--sm">
-                        <span className="fr-icon-user-line fr-icon--sm fr-mr-1v" aria-hidden="true"></span>
-                        {selectedConversation.clientNom} {selectedConversation.clientPrenom || ''} - {selectedConversation.animalNom}
+                        <span
+                          className="fr-icon-user-line fr-icon--sm fr-mr-1v"
+                          aria-hidden="true"
+                        ></span>
+                        {selectedConversation.clientNom} {selectedConversation.clientPrenom || ""} -{" "}
+                        {selectedConversation.animalNom}
                       </p>
                     </div>
 
@@ -501,11 +578,15 @@ export function MessageriePanel() {
                         messages.map((message) => (
                           <div
                             key={message.id}
-                            className={`fr-mb-2w fr-p-2w ${message.expediteur_type === "admin" ? "fr-background-alt--blue-france" : "fr-background-alt--grey"}`}
+                            className={`fr-mb-2w fr-p-2w ${
+                              message.expediteur_type === "admin"
+                                ? "fr-background-alt--blue-france"
+                                : "fr-background-alt--grey"
+                            }`}
                             style={{
                               borderRadius: "8px",
                               marginLeft: message.expediteur_type === "admin" ? "20%" : "0",
-                              marginRight: message.expediteur_type === "client" ? "20%" : "0"
+                              marginRight: message.expediteur_type === "client" ? "20%" : "0",
                             }}
                           >
                             <div className="fr-grid-row fr-grid-row--middle fr-grid-row--gutters fr-mb-1v">
@@ -532,7 +613,7 @@ export function MessageriePanel() {
                       <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Zone de reponse */}
+                    {/* Zone de réponse */}
                     <form onSubmit={handleSendMessage}>
                       <div className="fr-input-group">
                         <label className="fr-label" htmlFor="new-message">
@@ -554,7 +635,7 @@ export function MessageriePanel() {
                           className="fr-btn fr-icon-send-plane-line fr-btn--icon-left"
                           disabled={!newMessage.trim() || sendingMessage}
                         >
-                          {sendingMessage ? 'Envoi...' : 'Envoyer'}
+                          {sendingMessage ? "Envoi..." : "Envoyer"}
                         </button>
                         <button
                           type="button"
@@ -567,7 +648,7 @@ export function MessageriePanel() {
                         <input
                           ref={fileInputRef}
                           type="file"
-                          style={{ display: 'none' }}
+                          style={{ display: "none" }}
                           onChange={handleFileUpload}
                           accept="image/*,.pdf,.doc,.docx"
                         />

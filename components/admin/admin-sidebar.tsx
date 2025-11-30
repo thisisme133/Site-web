@@ -31,8 +31,8 @@ export function AdminSidebar({ activeSection, onSectionChange }: AdminSidebarPro
           <div className="fr-sidemenu__title">Navigation</div>
           <ul className="fr-sidemenu__list">
             {menuItems.map((item) => (
-              <li 
-                key={item.id} 
+              <li
+                key={item.id}
                 className={`fr-sidemenu__item ${activeSection === item.id ? "fr-sidemenu__item--active" : ""}`}
               >
                 <button
@@ -40,7 +40,7 @@ export function AdminSidebar({ activeSection, onSectionChange }: AdminSidebarPro
                   aria-current={activeSection === item.id ? "page" : undefined}
                   onClick={() => onSectionChange(item.id)}
                 >
-                  <span className={item.icon} aria-hidden="true"></span>
+                  <span className={`${item.icon} fr-mr-1w`} aria-hidden="true"></span>
                   {item.label}
                 </button>
               </li>

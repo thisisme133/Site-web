@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { FROM_EMAIL, isResendConfigured, resend } from '@/lib/resend-client'
 
 // GET - Récupérer les messages
 export async function GET(request: NextRequest) {
@@ -60,7 +61,51 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json(data, { status: 201 })
+    // Envoyer un email au client lorsqu'un administrateur répond
+    let emailNotification: 'sent' | 'skipped' | 'failed' | null = null
+
+    if (body.expediteur_type === 'admin') {
+      const { data: reservation, error: reservationError } = await supabaseAdmin
+        .from('reservations')
+        .select('client_email, client_nom, client_prenom, code, animal_nom')
+        .eq('id', body.reservation_id)
+        .single()
+
+      if (reservationError || !reservation) {
+        console.error('Reservation introuvable pour notification email:', reservationError)
+        emailNotification = 'skipped'
+      } else if (!isResendConfigured) {
+        console.warn("Notification email ignorée: RESEND_API_KEY manquant")
+        emailNotification = 'skipped'
+      } else {
+        try {
+          await resend.emails.send({
+            from: FROM_EMAIL,
+            to: reservation.client_email,
+            subject: `Nouveau message concernant ${reservation.animal_nom}`,
+            html: `
+            <p>Bonjour ${reservation.client_prenom ? `${reservation.client_prenom} ${reservation.client_nom}` : reservation.client_nom},</p>
+            <p>Vous avez reçu un nouveau message dans votre espace Les Petits Bergers :</p>
+            <blockquote style="border-left: 4px solid #000091; padding: 12px; margin: 16px 0; color: #1e1e1e;">${body.contenu}</blockquote>
+            <p>Pour répondre ou suivre votre demande, utilisez votre code de réservation <strong>${reservation.code}</strong>.</p>
+            <p>À très vite,<br>L'équipe Les Petits Bergers</p>
+          `,
+          })
+          emailNotification = 'sent'
+        } catch (emailError) {
+          console.error("Echec d'envoi d'email messagerie:", emailError)
+          emailNotification = 'failed'
+        }
+      }
+    }
+
+    return NextResponse.json(
+      {
+        ...data,
+        emailNotification,
+      },
+      { status: 201 }
+    )
   } catch (error) {
     console.error('Erreur:', error)
     return NextResponse.json(

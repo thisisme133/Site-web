@@ -87,7 +87,7 @@ export function ListeChiens({ onSelectChien, onNouveauChien }: ListeChiensProps)
       )}
 
       {/* Filtres */}
-      <div className="fr-grid-row fr-grid-row--gutters fr-mb-4w">
+      <div className="fr-grid-row fr-grid-row--gutters fr-grid-row--middle fr-mb-4w">
         <div className="fr-col-12 fr-col-md-6">
           <div className="fr-search-bar">
             <label className="fr-label" htmlFor="search-chien">
@@ -127,13 +127,11 @@ export function ListeChiens({ onSelectChien, onNouveauChien }: ListeChiensProps)
           </div>
         </div>
         <div className="fr-col-12 fr-col-md-2">
-          <button
-            className="fr-btn fr-icon-add-line fr-btn--icon-left fr-mt-4w"
-            onClick={onNouveauChien}
-            disabled={loading}
-          >
-            Nouveau
-          </button>
+          <div className="fr-btns-group fr-btns-group--icon-left fr-btns-group--inline fr-btns-group--center">
+            <button className="fr-btn fr-icon-add-line" onClick={onNouveauChien} disabled={loading}>
+              Nouveau
+            </button>
+          </div>
         </div>
       </div>
 

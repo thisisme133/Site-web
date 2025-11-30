@@ -183,70 +183,102 @@ export const emailTemplates = {
     numeroFacture: string
     montant: number
     pdfUrl?: string
+    dueDate?: string
+    status?: string
   }) => ({
     subject: `Facture ${data.numeroFacture} - Les Petits Bergers`,
     html: `
       <!DOCTYPE html>
-      <html>
+      <html lang="fr">
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Facture</title>
           <style>
+            :root {
+              color-scheme: light;
+              --primary: #000091;
+              --border: #e5e5f4;
+              --text: #161616;
+              --muted: #6a6a6a;
+            }
             body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+              font-family: 'Marianne', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
               line-height: 1.6;
-              color: #333;
-              max-width: 600px;
+              color: var(--text);
+              max-width: 680px;
               margin: 0 auto;
               padding: 20px;
+              background: #f6f6ff;
             }
-            .container {
-              background-color: #f9f9f9;
-              border-radius: 8px;
-              padding: 30px;
-              margin: 20px 0;
+            .card {
+              background: white;
+              border: 1px solid var(--border);
+              border-radius: 12px;
+              padding: 28px;
+              box-shadow: 0 6px 20px rgba(0,0,0,0.04);
             }
-            .amount {
-              background-color: #000091;
+            .banner {
+              background: var(--primary);
               color: white;
-              font-size: 28px;
-              font-weight: bold;
-              text-align: center;
-              padding: 20px;
-              border-radius: 8px;
-              margin: 20px 0;
+              padding: 14px 18px;
+              border-radius: 10px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 18px;
             }
-            .button {
+            .tag {
               display: inline-block;
-              background-color: #000091;
-              color: white;
-              padding: 12px 30px;
-              text-decoration: none;
-              border-radius: 4px;
-              margin: 20px 0;
+              padding: 6px 12px;
+              border-radius: 20px;
+              background: #ececff;
+              color: var(--primary);
+              font-weight: 600;
+              font-size: 13px;
             }
+            .muted { color: var(--muted); font-size: 14px; }
+            .cta {
+              display: inline-block;
+              background: var(--primary);
+              color: white !important;
+              padding: 12px 26px;
+              border-radius: 6px;
+              text-decoration: none;
+              font-weight: 700;
+              margin-top: 16px;
+            }
+            ul { padding-left: 18px; }
             .footer {
-              font-size: 12px;
-              color: #666;
               text-align: center;
-              margin-top: 30px;
-              padding-top: 20px;
-              border-top: 1px solid #ddd;
+              color: var(--muted);
+              font-size: 12px;
+              margin-top: 24px;
             }
           </style>
         </head>
         <body>
-          <div class="container">
-            <h1 style="color: #000091;">Votre facture</h1>
-            <p>Bonjour ${data.clientNom},</p>
-            <p>Veuillez trouver ci-joint votre facture <strong>${data.numeroFacture}</strong>.</p>
-
-            <div class="amount">
-              Montant : ${data.montant.toFixed(2)} €
+          <div class="card">
+            <div class="banner">
+              <div>
+                <div style="opacity:0.85;font-size:13px;">Les Petits Bergers</div>
+                <div style="font-size:20px;font-weight:700;">Facture ${data.numeroFacture}</div>
+              </div>
+              <div class="tag">${data.status === 'payee' ? 'Payée' : 'À régler'}</div>
             </div>
 
-            <p><strong>Modalités de paiement :</strong></p>
+            <p>Bonjour ${data.clientNom},</p>
+            <p>Votre facture est disponible. Vous pouvez la régler dès maintenant.</p>
+
+            <div style="display:flex;gap:16px;align-items:center;margin:18px 0;">
+              <div style="flex:1;">
+                <div class="muted">Montant TTC</div>
+                <div style="font-size:26px;font-weight:800;color:var(--primary);">${data.montant.toFixed(2)} €</div>
+              </div>
+              ${data.dueDate ? `<div style="flex:1;"><div class="muted">Échéance</div><div style="font-weight:700;">${new Date(data.dueDate).toLocaleDateString('fr-FR')}</div></div>` : ''}
+            </div>
+
+            <div class="muted" style="margin-top:12px;">Moyens de paiement acceptés :</div>
             <ul>
               <li>Virement bancaire</li>
               <li>Chèque</li>
@@ -254,13 +286,13 @@ export const emailTemplates = {
               <li>Carte bancaire</li>
             </ul>
 
-            ${data.pdfUrl ? `<a href="${data.pdfUrl}" class="button">Télécharger la facture PDF</a>` : ''}
+            ${data.pdfUrl ? `<a class="cta" href="${data.pdfUrl}">Télécharger la facture PDF</a>` : ''}
 
-            <p>Merci de votre confiance,<br>L'équipe Les Petits Bergers</p>
+            <p style="margin-top:20px;">Merci de votre confiance,<br>L'équipe Les Petits Bergers</p>
           </div>
           <div class="footer">
             <p>Les Petits Bergers - Garde et éducation canine</p>
-            <p>Pour toute question, répondez simplement à cet email.</p>
+            <p>Pour toute question, il suffit de répondre à cet email.</p>
           </div>
         </body>
       </html>

@@ -10,32 +10,9 @@ interface SearchResult {
   email: string
   telephone: string
   chiens: string[]
-  derniereVisite: string
+  derniereVisite: string | null
   nombreVisites: number
 }
-
-const mockResults: SearchResult[] = [
-  {
-    id: "1",
-    nom: "Dupont",
-    prenom: "Jean",
-    email: "jean.dupont@email.com",
-    telephone: "06 12 34 56 78",
-    chiens: ["Max", "Bella"],
-    derniereVisite: "2025-11-15",
-    nombreVisites: 12
-  },
-  {
-    id: "2",
-    nom: "Martin",
-    prenom: "Marie",
-    email: "marie.martin@email.com",
-    telephone: "06 98 76 54 32",
-    chiens: ["Rex"],
-    derniereVisite: "2025-10-20",
-    nombreVisites: 5
-  }
-]
 
 export function RgpdSuppressionForm() {
   const [searchType, setSearchType] = useState<"nom" | "email" | "chien">("nom")
@@ -44,35 +21,89 @@ export function RgpdSuppressionForm() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [deletionComplete, setDeletionComplete] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Simulation de recherche
-    if (searchValue.length >= 2) {
-      setResults(mockResults.filter(r => 
-        r.nom.toLowerCase().includes(searchValue.toLowerCase()) ||
-        r.prenom.toLowerCase().includes(searchValue.toLowerCase()) ||
-        r.email.toLowerCase().includes(searchValue.toLowerCase()) ||
-        r.chiens.some(c => c.toLowerCase().includes(searchValue.toLowerCase()))
-      ))
+
+    if (searchValue.length < 2) {
+      setError('Veuillez entrer au moins 2 caractères')
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      const response = await fetch('/api/rgpd/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ searchTerm: searchValue })
+      })
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la recherche')
+      }
+
+      const data = await response.json()
+      setResults(data)
+
+      if (data.length === 0) {
+        setError('Aucun résultat trouvé')
+      }
+    } catch (err) {
+      console.error('Erreur:', err)
+      setError('Impossible de rechercher les clients')
+    } finally {
+      setLoading(false)
     }
   }
 
   const toggleSelection = (id: string) => {
-    setSelectedIds(prev => 
-      prev.includes(id) 
+    setSelectedIds(prev =>
+      prev.includes(id)
         ? prev.filter(i => i !== id)
         : [...prev, id]
     )
   }
 
-  const handleDelete = () => {
-    // Simulation de suppression
-    setDeletionComplete(true)
-    setShowConfirmation(false)
-    setResults([])
-    setSelectedIds([])
-    setSearchValue("")
+  const handleDelete = async () => {
+    try {
+      setDeleting(true)
+
+      const response = await fetch('/api/rgpd/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userIds: selectedIds,
+          adminId: 'admin', // TODO: Get from session
+          raison: 'Demande client (RGPD)'
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la suppression')
+      }
+
+      const data = await response.json()
+
+      setDeletionComplete(true)
+      setShowConfirmation(false)
+      setResults([])
+      setSelectedIds([])
+      setSearchValue("")
+
+      // Afficher message de succès pendant 5 secondes
+      setTimeout(() => setDeletionComplete(false), 5000)
+    } catch (err) {
+      console.error('Erreur:', err)
+      setError('Impossible de supprimer les données')
+      setShowConfirmation(false)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -90,9 +121,9 @@ export function RgpdSuppressionForm() {
       <div className="fr-alert fr-alert--warning fr-mb-4w">
         <h3 className="fr-alert__title">Attention</h3>
         <p>
-          La suppression des donnees est irreversible. Conformement au RGPD, 
+          La suppression des donnees est irreversible. Conformement au RGPD,
           vous devez supprimer toutes les donnees personnelles d'un client sur sa demande.
-          Cette action supprimera toutes les informations associees : coordonnees, 
+          Cette action supprimera toutes les informations associees : coordonnees,
           historique des gardes, fiches des animaux et factures.
         </p>
       </div>
@@ -101,6 +132,12 @@ export function RgpdSuppressionForm() {
         <div className="fr-alert fr-alert--success fr-mb-4w">
           <h3 className="fr-alert__title">Suppression effectuee</h3>
           <p>Les donnees ont ete definitivement supprimees conformement au RGPD.</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="fr-alert fr-alert--error fr-mb-4w">
+          <p>{error}</p>
         </div>
       )}
 
@@ -141,16 +178,18 @@ export function RgpdSuppressionForm() {
                       value={searchValue}
                       onChange={(e) => setSearchValue(e.target.value)}
                       placeholder="Entrez votre recherche..."
+                      disabled={loading}
                     />
                   </div>
                 </div>
               </div>
               <div className="fr-col-12 fr-col-md-2">
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="fr-btn fr-icon-search-line fr-btn--icon-left fr-mt-4w"
+                  disabled={loading || searchValue.length < 2}
                 >
-                  Rechercher
+                  {loading ? 'Recherche...' : 'Rechercher'}
                 </button>
               </div>
             </div>
@@ -170,8 +209,8 @@ export function RgpdSuppressionForm() {
                 <tr>
                   <th scope="col">
                     <div className="fr-checkbox-group">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         id="select-all"
                         checked={selectedIds.length === results.length}
                         onChange={() => {
@@ -200,8 +239,8 @@ export function RgpdSuppressionForm() {
                   <tr key={result.id}>
                     <td>
                       <div className="fr-checkbox-group">
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           id={`select-${result.id}`}
                           checked={selectedIds.includes(result.id)}
                           onChange={() => toggleSelection(result.id)}
@@ -215,11 +254,19 @@ export function RgpdSuppressionForm() {
                     <td>{result.email}</td>
                     <td>{result.telephone}</td>
                     <td>
-                      {result.chiens.map(c => (
-                        <span key={c} className="fr-tag fr-tag--sm fr-mr-1w">{c}</span>
-                      ))}
+                      {result.chiens.length > 0 ? (
+                        result.chiens.map(c => (
+                          <span key={c} className="fr-tag fr-tag--sm fr-mr-1w">{c}</span>
+                        ))
+                      ) : (
+                        <span className="fr-text--sm">Aucun</span>
+                      )}
                     </td>
-                    <td>{result.derniereVisite}</td>
+                    <td>
+                      {result.derniereVisite
+                        ? new Date(result.derniereVisite).toLocaleDateString("fr-FR")
+                        : 'Jamais'}
+                    </td>
                     <td>
                       <span className="fr-badge fr-badge--info fr-badge--no-icon">
                         {result.nombreVisites}
@@ -237,6 +284,7 @@ export function RgpdSuppressionForm() {
                 type="button"
                 className="fr-btn fr-btn--secondary fr-icon-delete-line fr-btn--icon-left"
                 onClick={() => setShowConfirmation(true)}
+                disabled={deleting}
               >
                 Supprimer les {selectedIds.length} enregistrement(s) selectionne(s)
               </button>
@@ -253,10 +301,11 @@ export function RgpdSuppressionForm() {
               <div className="fr-col-12 fr-col-md-8 fr-col-lg-6">
                 <div className="fr-modal__body">
                   <div className="fr-modal__header">
-                    <button 
-                      className="fr-btn--close fr-btn" 
+                    <button
+                      className="fr-btn--close fr-btn"
                       title="Fermer"
                       onClick={() => setShowConfirmation(false)}
+                      disabled={deleting}
                     >
                       Fermer
                     </button>
@@ -281,17 +330,19 @@ export function RgpdSuppressionForm() {
                   <div className="fr-modal__footer">
                     <ul className="fr-btns-group fr-btns-group--inline-reverse fr-btns-group--inline-lg">
                       <li>
-                        <button 
+                        <button
                           className="fr-btn"
                           onClick={handleDelete}
+                          disabled={deleting}
                         >
-                          Confirmer la suppression
+                          {deleting ? 'Suppression...' : 'Confirmer la suppression'}
                         </button>
                       </li>
                       <li>
-                        <button 
+                        <button
                           className="fr-btn fr-btn--secondary"
                           onClick={() => setShowConfirmation(false)}
+                          disabled={deleting}
                         >
                           Annuler
                         </button>

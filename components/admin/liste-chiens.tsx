@@ -1,44 +1,67 @@
 // components/admin/liste-chiens.tsx
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 interface Chien {
   id: string
   nom: string
   race: string
-  age: string
-  proprietaire: string
-  derniereVisite: string
-  nombreVisites: number
+  age: string | null
+  proprietaireNom: string
+  derniereVisite: string | null
+  nbVisites: number
   statut: "actif" | "inactif"
 }
 
-const mockChiens: Chien[] = [
-  { id: "1", nom: "Max", race: "Berger Allemand", age: "4 ans", proprietaire: "Jean Dupont", derniereVisite: "2025-11-28", nombreVisites: 24, statut: "actif" },
-  { id: "2", nom: "Luna", race: "Golden Retriever", age: "2 ans", proprietaire: "Marie Martin", derniereVisite: "2025-11-25", nombreVisites: 18, statut: "actif" },
-  { id: "3", nom: "Rex", race: "Labrador", age: "6 ans", proprietaire: "Pierre Bernard", derniereVisite: "2025-11-20", nombreVisites: 15, statut: "actif" },
-  { id: "4", nom: "Bella", race: "Beagle", age: "3 ans", proprietaire: "Sophie Petit", derniereVisite: "2025-10-15", nombreVisites: 12, statut: "actif" },
-  { id: "5", nom: "Rocky", race: "Boxer", age: "5 ans", proprietaire: "Thomas Moreau", derniereVisite: "2025-09-10", nombreVisites: 10, statut: "inactif" },
-]
-
 interface ListeChiensProps {
   onSelectChien: (id: string) => void
+  onNouveauChien?: () => void
 }
 
-export function ListeChiens({ onSelectChien }: ListeChiensProps) {
+export function ListeChiens({ onSelectChien, onNouveauChien }: ListeChiensProps) {
+  const [chiens, setChiens] = useState<Chien[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterStatut, setFilterStatut] = useState<"tous" | "actif" | "inactif">("tous")
 
-  const filteredChiens = mockChiens.filter(chien => {
-    const matchSearch = 
+  // Charger les chiens depuis l'API
+  useEffect(() => {
+    fetchChiens()
+  }, [])
+
+  const fetchChiens = async () => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams()
+      if (filterStatut !== "tous") {
+        params.append("statut", filterStatut)
+      }
+
+      const response = await fetch(`/api/chiens?${params}`)
+      if (!response.ok) {
+        throw new Error('Erreur lors du chargement des chiens')
+      }
+
+      const data = await response.json()
+      setChiens(data)
+      setError(null)
+    } catch (err) {
+      console.error('Erreur:', err)
+      setError('Impossible de charger la liste des chiens')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredChiens = chiens.filter(chien => {
+    const matchSearch =
       chien.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
       chien.race.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      chien.proprietaire.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchStatut = filterStatut === "tous" || chien.statut === filterStatut
+      chien.proprietaireNom.toLowerCase().includes(searchTerm.toLowerCase())
 
-    return matchSearch && matchStatut
+    return matchSearch
   })
 
   return (
@@ -52,6 +75,16 @@ export function ListeChiens({ onSelectChien }: ListeChiensProps) {
           Consultez et gerez les fiches de suivi de vos pensionnaires
         </p>
       </div>
+
+      {/* Message d'erreur */}
+      {error && (
+        <div className="fr-alert fr-alert--error fr-mb-4w">
+          <p>{error}</p>
+          <button className="fr-btn fr-btn--sm" onClick={fetchChiens}>
+            Réessayer
+          </button>
+        </div>
+      )}
 
       {/* Filtres */}
       <div className="fr-grid-row fr-grid-row--gutters fr-mb-4w">
@@ -82,7 +115,10 @@ export function ListeChiens({ onSelectChien }: ListeChiensProps) {
               className="fr-select"
               id="filter-statut"
               value={filterStatut}
-              onChange={(e) => setFilterStatut(e.target.value as typeof filterStatut)}
+              onChange={(e) => {
+                setFilterStatut(e.target.value as typeof filterStatut)
+                fetchChiens()
+              }}
             >
               <option value="tous">Tous les chiens</option>
               <option value="actif">Clients actifs</option>
@@ -91,62 +127,81 @@ export function ListeChiens({ onSelectChien }: ListeChiensProps) {
           </div>
         </div>
         <div className="fr-col-12 fr-col-md-2">
-          <button className="fr-btn fr-icon-add-line fr-btn--icon-left fr-mt-4w">
+          <button
+            className="fr-btn fr-icon-add-line fr-btn--icon-left fr-mt-4w"
+            onClick={onNouveauChien}
+            disabled={loading}
+          >
             Nouveau
           </button>
         </div>
       </div>
 
+      {/* Indicateur de chargement */}
+      {loading && (
+        <div className="fr-mb-4w" style={{ textAlign: 'center' }}>
+          <p>Chargement de la liste des chiens...</p>
+        </div>
+      )}
+
       {/* Liste */}
-      <div className="fr-grid-row fr-grid-row--gutters">
-        {filteredChiens.map((chien) => (
-          <div key={chien.id} className="fr-col-12 fr-col-md-6 fr-col-lg-4">
-            <div className="fr-card fr-enlarge-link">
-              <div className="fr-card__body">
-                <div className="fr-card__content">
-                  <h3 className="fr-card__title">
-                    <button onClick={() => onSelectChien(chien.id)}>
-                      {chien.nom}
-                    </button>
-                  </h3>
-                  <p className="fr-card__desc">
-                    {chien.race} - {chien.age}
-                  </p>
-                  <div className="fr-card__start">
-                    <ul className="fr-tags-group">
-                      <li>
-                        <p className={`fr-tag fr-tag--sm ${chien.statut === "actif" ? "fr-tag--green-emeraude" : ""}`}>
-                          {chien.statut === "actif" ? "Actif" : "Inactif"}
-                        </p>
-                      </li>
-                      <li>
-                        <p className="fr-tag fr-tag--sm">
-                          {chien.nombreVisites} visites
-                        </p>
-                      </li>
-                    </ul>
-                  </div>
-                  <div className="fr-card__end">
-                    <p className="fr-card__detail">
-                      <span className="fr-icon-user-line fr-icon--sm fr-mr-1v" aria-hidden="true"></span>
-                      {chien.proprietaire}
+      {!loading && (
+        <div className="fr-grid-row fr-grid-row--gutters">
+          {filteredChiens.map((chien) => (
+            <div key={chien.id} className="fr-col-12 fr-col-md-6 fr-col-lg-4">
+              <div className="fr-card fr-enlarge-link">
+                <div className="fr-card__body">
+                  <div className="fr-card__content">
+                    <h3 className="fr-card__title">
+                      <button onClick={() => onSelectChien(chien.id)}>
+                        {chien.nom}
+                      </button>
+                    </h3>
+                    <p className="fr-card__desc">
+                      {chien.race} {chien.age ? `- ${chien.age}` : ''}
                     </p>
-                    <p className="fr-card__detail">
-                      <span className="fr-icon-calendar-line fr-icon--sm fr-mr-1v" aria-hidden="true"></span>
-                      Derniere visite : {new Date(chien.derniereVisite).toLocaleDateString("fr-FR")}
-                    </p>
+                    <div className="fr-card__start">
+                      <ul className="fr-tags-group">
+                        <li>
+                          <p className={`fr-tag fr-tag--sm ${chien.statut === "actif" ? "fr-tag--green-emeraude" : ""}`}>
+                            {chien.statut === "actif" ? "Actif" : "Inactif"}
+                          </p>
+                        </li>
+                        <li>
+                          <p className="fr-tag fr-tag--sm">
+                            {chien.nbVisites} visites
+                          </p>
+                        </li>
+                      </ul>
+                    </div>
+                    <div className="fr-card__end">
+                      <p className="fr-card__detail">
+                        <span className="fr-icon-user-line fr-icon--sm fr-mr-1v" aria-hidden="true"></span>
+                        {chien.proprietaireNom}
+                      </p>
+                      {chien.derniereVisite && (
+                        <p className="fr-card__detail">
+                          <span className="fr-icon-calendar-line fr-icon--sm fr-mr-1v" aria-hidden="true"></span>
+                          Derniere visite : {new Date(chien.derniereVisite).toLocaleDateString("fr-FR")}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {filteredChiens.length === 0 && (
+      {!loading && filteredChiens.length === 0 && !error && (
         <div className="fr-callout">
           <h3 className="fr-callout__title">Aucun resultat</h3>
-          <p>Aucun chien ne correspond a vos criteres de recherche.</p>
+          <p>
+            {chiens.length === 0
+              ? "Aucun chien enregistré. Cliquez sur 'Nouveau' pour ajouter une fiche."
+              : "Aucun chien ne correspond a vos criteres de recherche."}
+          </p>
         </div>
       )}
     </div>

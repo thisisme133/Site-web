@@ -2,7 +2,18 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Script from "next/script"
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts"
 
 type Periode = "mensuel" | "trimestre" | "semestre" | "annuel"
 
@@ -24,11 +35,20 @@ interface StatsData {
     race: string
     visites: number
   }>
+  reservationsParSexe: {
+    labels: string[]
+    male: number[]
+    femelle: number[]
+  }
+  reservationsParType: {
+    labels: string[]
+    garde: number[]
+    comportementaliste: number[]
+  }
 }
 
 export function DashboardStats() {
   const [periode, setPeriode] = useState<Periode>("mensuel")
-  const [chartsLoaded, setChartsLoaded] = useState(false)
   const [stats, setStats] = useState<StatsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -58,18 +78,20 @@ export function DashboardStats() {
   const currentData = stats?.gardesData[periode] || { labels: [], values: [] }
   const statsGlobales = stats?.statsGlobales || { totalGardes: 0, totalActes: 0, totalChiens: 0, caAnnuel: 0 }
   const chiensFrequents = stats?.chiensFrequents || []
+  const dataGardes = currentData.labels.map((label, index) => ({ label, gardes: currentData.values[index] }))
+  const dataSexe = stats?.reservationsParSexe?.labels.map((label, index) => ({
+    label,
+    males: stats?.reservationsParSexe?.male[index] || 0,
+    femelles: stats?.reservationsParSexe?.femelle[index] || 0,
+  })) || []
+  const dataType = stats?.reservationsParType?.labels.map((label, index) => ({
+    label,
+    garde: stats?.reservationsParType?.garde[index] || 0,
+    comportementaliste: stats?.reservationsParType?.comportementaliste[index] || 0,
+  })) || []
 
   return (
     <>
-      <Script 
-        src="https://unpkg.com/@gouvfr/dsfr-chart@1.0.0/dist/DSFRChart.umd.cjs"
-        onLoad={() => setChartsLoaded(true)}
-      />
-      <link 
-        rel="stylesheet" 
-        href="https://unpkg.com/@gouvfr/dsfr-chart@1.0.0/dist/DSFRChart.css" 
-      />
-
       <div className="fr-mb-4w">
         <h1 className="fr-h2">
           <span className="fr-icon-dashboard-3-line fr-mr-2w" aria-hidden="true"></span>
@@ -102,7 +124,7 @@ export function DashboardStats() {
                   Gardes
                 </h3>
                 <p className="fr-card__desc fr-text--bold fr-text--lg">{statsGlobales.totalGardes}</p>
-                <p className="fr-card__detail">Total cette annee</p>
+                <p className="fr-card__detail">Total cette année</p>
               </div>
             </div>
           </div>
@@ -151,9 +173,9 @@ export function DashboardStats() {
         </div>
       </div>
 
-      {/* Selecteur de periode */}
+      {/* Sélecteur de période */}
       <fieldset className="fr-segmented fr-segmented--no-legend fr-mb-4w">
-        <legend className="fr-segmented__legend">Periode</legend>
+        <legend className="fr-segmented__legend">Période</legend>
         <div className="fr-segmented__elements">
           <div className="fr-segmented__element">
             <input 
@@ -204,59 +226,94 @@ export function DashboardStats() {
           <div className="fr-card__content">
             <h3 className="fr-card__title">
               <span className="fr-icon-line-chart-line fr-mr-1w" aria-hidden="true"></span>
-              Evolution des gardes
+              Évolution des gardes
             </h3>
-            {chartsLoaded && !loading && currentData.labels.length > 0 && (
-              <bar-chart
-                x={JSON.stringify(currentData.labels)}
-                y={JSON.stringify(currentData.values)}
-                name={JSON.stringify(["Nombre de gardes"])}
-                selected-palette="categorical"
-                unit-tooltip="gardes"
-              ></bar-chart>
+            {!loading && currentData.labels.length > 0 && (
+              <div style={{ width: '100%', height: 320 }}>
+                <ResponsiveContainer>
+                  <BarChart data={dataGardes}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="label" />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip formatter={(value: number) => `${value} gardes`} />
+                    <Legend />
+                    <Bar dataKey="gardes" name="Nombre de gardes" fill="#000091" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             )}
             {!loading && currentData.labels.length === 0 && (
               <p className="fr-text--sm">Aucune donnée disponible pour cette période</p>
             )}
-            {/* Alternative textuelle pour accessibilite */}
-            <details className="fr-accordion fr-mt-2w">
-              <summary className="fr-accordion__btn">Voir les donnees en tableau</summary>
-              <div className="fr-collapse">
-                <table className="fr-table">
-                  <thead>
-                    <tr>
-                      <th>Periode</th>
-                      <th>Nombre de gardes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentData.labels.length > 0 ? (
-                      currentData.labels.map((label, index) => (
-                        <tr key={label}>
-                          <td>{label}</td>
-                          <td>{currentData.values[index]}</td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={2}>Aucune donnée disponible</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </details>
           </div>
         </div>
       </div>
 
-      {/* Chiens les plus frequents */}
+      {/* Courbe des réservations par sexe */}
+      <div className="fr-card fr-card--no-border fr-mb-4w">
+        <div className="fr-card__body">
+          <div className="fr-card__content">
+            <h3 className="fr-card__title">
+              <span className="fr-icon-line-chart-line fr-mr-1w" aria-hidden="true"></span>
+              Courbe des réservations par sexe du chien
+            </h3>
+            {!loading && dataSexe.length > 0 ? (
+              <div style={{ width: '100%', height: 320 }}>
+                <ResponsiveContainer>
+                  <LineChart data={dataSexe}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="label" />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip formatter={(value: number) => `${value} réservations`} />
+                    <Legend />
+                    <Line type="monotone" dataKey="males" name="Mâles" stroke="#000091" strokeWidth={2} />
+                    <Line type="monotone" dataKey="femelles" name="Femelles" stroke="#6a6af4" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              !loading && <p className="fr-text--sm">Aucune réservation enregistrée cette année</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Courbe des réservations par type */}
+      <div className="fr-card fr-card--no-border fr-mb-4w">
+        <div className="fr-card__body">
+          <div className="fr-card__content">
+            <h3 className="fr-card__title">
+              <span className="fr-icon-line-chart-line fr-mr-1w" aria-hidden="true"></span>
+              Courbe des gardes et séances comportementalistes
+            </h3>
+            {!loading && dataType.length > 0 ? (
+              <div style={{ width: '100%', height: 320 }}>
+                <ResponsiveContainer>
+                  <LineChart data={dataType}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="label" />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip formatter={(value: number) => `${value} demandes`} />
+                    <Legend />
+                    <Line type="monotone" dataKey="garde" name="Gardes" stroke="#008941" strokeWidth={2} />
+                    <Line type="monotone" dataKey="comportementaliste" name="Comportementaliste" stroke="#de3831" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              !loading && <p className="fr-text--sm">Aucune donnée à afficher pour l'instant</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Chiens les plus fréquents */}
       <div className="fr-card fr-card--no-border">
         <div className="fr-card__body">
           <div className="fr-card__content">
             <h3 className="fr-card__title">
               <span className="fr-icon-star-line fr-mr-1w" aria-hidden="true"></span>
-              Chiens les plus frequents
+              Chiens les plus fréquents
             </h3>
             <div className="fr-table">
               <table>
@@ -295,20 +352,9 @@ export function DashboardStats() {
               </table>
             </div>
 
-            {chartsLoaded && !loading && chiensFrequents.length > 0 && (
-              <div className="fr-mt-4w">
-                <pie-chart
-                  x={JSON.stringify(chiensFrequents.map((c) => c.nom))}
-                  y={JSON.stringify(chiensFrequents.map((c) => c.visites))}
-                  name={JSON.stringify(chiensFrequents.map((c) => c.nom))}
-                  unit-tooltip="visites"
-                  selected-palette="categorical"
-                ></pie-chart>
-              </div>
-            )}
+            </div>
           </div>
         </div>
-      </div>
     </>
   )
 }

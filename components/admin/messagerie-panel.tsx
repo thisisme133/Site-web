@@ -1,7 +1,7 @@
 // components/admin/messagerie-panel.tsx
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef } from "react"
 
 interface Message {
   id: string
@@ -32,6 +32,7 @@ export function MessageriePanel() {
   const [messages, setMessages] = useState<Message[]>([])
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [newMessage, setNewMessage] = useState("")
+  const [filtreStatut, setFiltreStatut] = useState<string>("tous")
   const [loading, setLoading] = useState(true)
   const [sendingMessage, setSendingMessage] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
@@ -66,16 +67,16 @@ export function MessageriePanel() {
   const fetchConversations = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/messages/conversations')
+      const response = await fetch("/api/messages/conversations")
       if (!response.ok) {
-        throw new Error('Erreur lors du chargement des conversations')
+        throw new Error("Erreur lors du chargement des conversations")
       }
       const data = await response.json()
       setConversations(data)
       setError(null)
     } catch (err) {
-      console.error('Erreur:', err)
-      setError('Impossible de charger les conversations')
+      console.error("Erreur:", err)
+      setError("Impossible de charger les conversations")
     } finally {
       setLoading(false)
     }
@@ -85,47 +86,48 @@ export function MessageriePanel() {
     try {
       const response = await fetch(`/api/messages?reservation_id=${reservationId}`)
       if (!response.ok) {
-        throw new Error('Erreur lors du chargement des messages')
+        throw new Error("Erreur lors du chargement des messages")
       }
       const data = await response.json()
       setMessages(data)
     } catch (err) {
-      console.error('Erreur:', err)
+      console.error("Erreur:", err)
     }
   }
 
-  const handleReservationAction = async (action: 'accepter' | 'refuser' | 'demander_infos') => {
+  const handleReservationAction = async (action: "accepter" | "refuser" | "demander_infos") => {
     if (!selectedConversation) return
 
     try {
       setUpdatingStatus(true)
       setActionError(null)
-      const response = await fetch('/api/reservations', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/reservations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: selectedConversation.reservationId,
           action,
           message: actionMessage || undefined,
           piecesJointes: actionAttachments,
-        })
+        }),
       })
 
       const data = await response.json()
       if (!response.ok) {
-        throw new Error(data.error || 'Impossible de mettre a jour la reservation')
+        throw new Error(data.error || "Impossible de mettre à jour la réservation")
       }
 
-      setActionSuccess('Reservation mise a jour')
-      setSelectedConversation(prev => prev ? { ...prev, statut: data.statut } : prev)
+      setActionSuccess("Réservation mise à jour")
+
+      setSelectedConversation((prev) => (prev ? { ...prev, statut: data.statut } : prev))
       setActionMessage("")
       setActionAttachments([])
       await fetchMessages(selectedConversation.reservationId)
       await fetchConversations()
       setTimeout(() => setActionSuccess(null), 3000)
     } catch (err) {
-      console.error('Erreur:', err)
-      setActionError(err instanceof Error ? err.message : 'Erreur inconnue')
+      console.error("Erreur:", err)
+      setActionError(err instanceof Error ? err.message : "Erreur inconnue")
     } finally {
       setUpdatingStatus(false)
     }
@@ -133,15 +135,15 @@ export function MessageriePanel() {
 
   const markAsRead = async (conversationId: string) => {
     try {
-      await fetch('/api/messages/mark-read', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId })
+      await fetch("/api/messages/mark-read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId }),
       })
       // Rafraîchir les conversations pour mettre à jour les compteurs
       fetchConversations()
     } catch (err) {
-      console.error('Erreur marquer comme lu:', err)
+      console.error("Erreur marquer comme lu:", err)
     }
   }
 
@@ -151,20 +153,20 @@ export function MessageriePanel() {
 
     try {
       setSendingMessage(true)
-      const response = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversation_id: selectedConversation.conversationId,
           reservation_id: selectedConversation.reservationId,
-          expediteur_type: 'admin',
-          expediteur_nom: 'Admin',
+          expediteur_type: "admin",
+          expediteur_nom: "Admin",
           contenu: newMessage,
-        })
+        }),
       })
 
       if (!response.ok) {
-        throw new Error('Erreur lors de l\'envoi du message')
+        throw new Error("Erreur lors de l'envoi du message")
       }
 
       setNewMessage("")
@@ -172,8 +174,8 @@ export function MessageriePanel() {
       await fetchMessages(selectedConversation.reservationId)
       await fetchConversations()
     } catch (err) {
-      console.error('Erreur:', err)
-      alert('Impossible d\'envoyer le message')
+      console.error("Erreur:", err)
+      alert("Impossible d'envoyer le message")
     } finally {
       setSendingMessage(false)
     }
@@ -186,43 +188,43 @@ export function MessageriePanel() {
     try {
       setUploadingFile(true)
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append("file", file)
 
-      const response = await fetch('/api/messages/upload', {
-        method: 'POST',
-        body: formData
+      const response = await fetch("/api/messages/upload", {
+        method: "POST",
+        body: formData,
       })
 
       if (!response.ok) {
-        throw new Error('Erreur lors de l\'upload du fichier')
+        throw new Error("Erreur lors de l'upload du fichier")
       }
 
       const data = await response.json()
 
       // Ajouter le fichier comme message
       if (selectedConversation) {
-        await fetch('/api/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        await fetch("/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             conversation_id: selectedConversation.conversationId,
             reservation_id: selectedConversation.reservationId,
-            expediteur_type: 'admin',
-            expediteur_nom: 'Admin',
+            expediteur_type: "admin",
+            expediteur_nom: "Admin",
             contenu: `📎 Fichier joint: ${data.nom}`,
-            pieces_jointes: [data]
-          })
+            pieces_jointes: [data],
+          }),
         })
 
         await fetchMessages(selectedConversation.reservationId)
       }
     } catch (err) {
-      console.error('Erreur:', err)
-      alert('Impossible d\'uploader le fichier')
+      console.error("Erreur:", err)
+      alert("Impossible de téléverser le fichier")
     } finally {
       setUploadingFile(false)
       if (fileInputRef.current) {
-        fileInputRef.current.value = ''
+        fileInputRef.current.value = ""
       }
     }
   }
@@ -234,26 +236,26 @@ export function MessageriePanel() {
     try {
       setUploadingFile(true)
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append("file", file)
 
-      const response = await fetch('/api/messages/upload', {
-        method: 'POST',
-        body: formData
+      const response = await fetch("/api/messages/upload", {
+        method: "POST",
+        body: formData,
       })
 
       if (!response.ok) {
-        throw new Error('Erreur lors de l\'upload du fichier')
+        throw new Error("Erreur lors de l'upload du fichier")
       }
 
       const data = await response.json()
       setActionAttachments((prev) => [...prev, data])
     } catch (err) {
-      console.error('Erreur:', err)
-      setActionError('Impossible d\'ajouter la piece jointe')
+      console.error("Erreur:", err)
+      setActionError("Impossible d'ajouter la pièce jointe")
     } finally {
       setUploadingFile(false)
       if (actionFileInputRef.current) {
-        actionFileInputRef.current.value = ''
+        actionFileInputRef.current.value = ""
       }
     }
   }
@@ -268,21 +270,30 @@ export function MessageriePanel() {
     } else if (diffDays === 1) {
       return `Hier ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
     } else {
-      return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+      return date.toLocaleDateString("fr-FR", {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
     }
   }
 
   const renderStatutBadge = (statut: string) => {
     switch (statut) {
-      case 'confirmee':
-        return <span className="fr-badge fr-badge--success fr-badge--no-icon">Confirmee</span>
-      case 'annulee':
-        return <span className="fr-badge fr-badge--error fr-badge--no-icon">Refusee</span>
-      case 'en_attente':
+      case "confirmee":
+        return <span className="fr-badge fr-badge--success fr-badge--no-icon">Confirmée</span>
+      case "annulee":
+        return <span className="fr-badge fr-badge--error fr-badge--no-icon">Refusée</span>
+      case "en_attente":
       default:
         return <span className="fr-badge fr-badge--info fr-badge--no-icon">En attente</span>
     }
   }
+
+  const conversationsFiltrees = conversations.filter((conv) =>
+    filtreStatut === "tous" ? true : conv.statut === filtreStatut
+  )
 
   return (
     <div>
@@ -292,7 +303,7 @@ export function MessageriePanel() {
           Messagerie
         </h1>
         <p className="fr-text--lead">
-          Gerez vos echanges avec les clients
+          Gérez vos échanges avec les clients et gardez la trace des décisions sur les réservations.
         </p>
       </div>
 
@@ -308,7 +319,7 @@ export function MessageriePanel() {
 
       {/* Indicateur de chargement */}
       {loading && (
-        <div className="fr-mb-4w" style={{ textAlign: 'center' }}>
+        <div className="fr-mb-4w" style={{ textAlign: "center" }}>
           <p>Chargement des conversations...</p>
         </div>
       )}
@@ -320,45 +331,67 @@ export function MessageriePanel() {
             <div className="fr-card fr-card--no-border">
               <div className="fr-card__body">
                 <div className="fr-card__content">
-                  <h3 className="fr-card__title">
-                    <span className="fr-icon-chat-3-line fr-mr-1w" aria-hidden="true"></span>
-                    Conversations ({conversations.length})
-                  </h3>
+                  <div className="fr-grid-row fr-grid-row--middle fr-grid-row--gutters fr-mb-2w">
+                    <div className="fr-col">
+                      <h3 className="fr-card__title fr-mb-0">
+                        <span className="fr-icon-chat-3-line fr-mr-1w" aria-hidden="true"></span>
+                        Conversations ({conversationsFiltrees.length}/{conversations.length})
+                      </h3>
+                    </div>
+                    <div className="fr-col-auto">
+                      <label className="fr-label" htmlFor="filtre-statut">
+                        Statut
+                      </label>
+                      <select
+                        id="filtre-statut"
+                        className="fr-select"
+                        value={filtreStatut}
+                        onChange={(e) => setFiltreStatut(e.target.value)}
+                      >
+                        <option value="tous">Tous</option>
+                        <option value="en_attente">En attente</option>
+                        <option value="confirmee">Confirmée</option>
+                        <option value="annulee">Refusée</option>
+                      </select>
+                    </div>
+                  </div>
 
-                  {conversations.length === 0 ? (
-                    <p className="fr-text--sm">Aucune conversation</p>
+                  {conversationsFiltrees.length === 0 ? (
+                    <p className="fr-text--sm">Aucune conversation dans ce statut</p>
                   ) : (
-                    <ul className="fr-raw-list">
-                      {conversations.map((conv) => (
+                    <ul className="fr-raw-list fr-p-0" style={{ maxHeight: "520px", overflowY: "auto" }}>
+                      {conversationsFiltrees.map((conv) => (
                         <li key={conv.id} className="fr-mb-2w">
                           <button
-                            className={`fr-tile fr-tile--horizontal fr-enlarge-link ${selectedConversation?.id === conv.id ? "fr-tile--grey" : ""}`}
+                            className={`fr-btn fr-btn--tertiary-no-outline fr-btn--icon-left fr-btn--sm fr-btn--full ${
+                              selectedConversation?.id === conv.id ? "fr-btn--secondary" : ""
+                            }`}
+                            style={{
+                              justifyContent: "flex-start",
+                              textAlign: "left",
+                              whiteSpace: "normal",
+                            }}
                             onClick={() => setSelectedConversation(conv)}
                           >
-                            <div className="fr-tile__body">
-                              <div className="fr-tile__content">
-                                <h4 className="fr-tile__title">
-                                  {conv.clientNom}
-                                  {conv.messagesNonLus > 0 && (
-                                    <span className="fr-badge fr-badge--info fr-badge--sm fr-ml-1w">
-                                      {conv.messagesNonLus}
-                                    </span>
-                                  )}
-                                </h4>
-                                <p className="fr-tile__detail">
-                                  <span className="fr-icon-user-heart-line fr-icon--sm fr-mr-1v" aria-hidden="true"></span>
-                                  {conv.animalNom}
-                                </p>
-                                <p className="fr-tile__desc fr-text--sm">
-                                  {conv.dernierMessage.length > 40
-                                    ? `${conv.dernierMessage.substring(0, 40)}...`
-                                    : conv.dernierMessage}
-                                </p>
-                                <p className="fr-tile__detail fr-text--xs">
-                                  {formatDate(conv.derniereActivite)}
-                                </p>
+                            <span className="fr-icon-user-heart-line" aria-hidden="true"></span>
+                            <span className="fr-ml-1w">
+                              <span className="fr-text--bold">{conv.clientNom}</span>
+                              <span className="fr-text--sm fr-text-mention--grey"> · {conv.animalNom}</span>
+                              <div className="fr-text--xs fr-mt-1v">
+                                {renderStatutBadge(conv.statut)}
+                                <span className="fr-ml-1w">{formatDate(conv.derniereActivite)}</span>
+                                {conv.messagesNonLus > 0 && (
+                                  <span className="fr-badge fr-badge--info fr-badge--sm fr-ml-1w">
+                                    {conv.messagesNonLus}
+                                  </span>
+                                )}
                               </div>
-                            </div>
+                              <div className="fr-text--sm fr-mt-1v" style={{ color: "#3a3a3a" }}>
+                                {conv.dernierMessage.length > 60
+                                  ? `${conv.dernierMessage.substring(0, 60)}...`
+                                  : conv.dernierMessage || "Pas encore de message"}
+                              </div>
+                            </span>
                           </button>
                         </li>
                       ))}
@@ -375,12 +408,16 @@ export function MessageriePanel() {
               <div className="fr-card fr-card--no-border">
                 <div className="fr-card__body">
                   <div className="fr-card__content">
-                    {/* En-tete */}
+                    {/* En-tête */}
                     <div className="fr-mb-3w">
                       <h3 className="fr-h5 fr-mb-1v">{selectedConversation.sujet}</h3>
                       <p className="fr-text--sm">
-                        <span className="fr-icon-user-line fr-icon--sm fr-mr-1v" aria-hidden="true"></span>
-                        {selectedConversation.clientNom} {selectedConversation.clientPrenom || ''} - {selectedConversation.animalNom}
+                        <span
+                          className="fr-icon-user-line fr-icon--sm fr-mr-1v"
+                          aria-hidden="true"
+                        ></span>
+                        {selectedConversation.clientNom} {selectedConversation.clientPrenom || ""} -{" "}
+                        {selectedConversation.animalNom}
                       </p>
                     </div>
 
@@ -396,7 +433,7 @@ export function MessageriePanel() {
                           <button
                             type="button"
                             className="fr-btn fr-icon-check-line fr-btn--icon-left"
-                            onClick={() => handleReservationAction('accepter')}
+                            onClick={() => handleReservationAction("accepter")}
                             disabled={updatingStatus}
                           >
                             Accepter
@@ -404,7 +441,7 @@ export function MessageriePanel() {
                           <button
                             type="button"
                             className="fr-btn fr-btn--secondary fr-icon-close-line fr-btn--icon-left"
-                            onClick={() => handleReservationAction('refuser')}
+                            onClick={() => handleReservationAction("refuser")}
                             disabled={updatingStatus}
                           >
                             Refuser
@@ -412,10 +449,10 @@ export function MessageriePanel() {
                           <button
                             type="button"
                             className="fr-btn fr-btn--tertiary-no-outline fr-icon-mail-line fr-btn--icon-left"
-                            onClick={() => handleReservationAction('demander_infos')}
+                            onClick={() => handleReservationAction("demander_infos")}
                             disabled={updatingStatus}
                           >
-                            Infos complementaires
+                            Infos complémentaires
                           </button>
                         </div>
                       </div>
@@ -443,7 +480,7 @@ export function MessageriePanel() {
                             className="fr-input"
                             id="action-message"
                             rows={3}
-                            placeholder="Precisez les conditions ou les informations demandees"
+                            placeholder="Précisez les conditions ou les informations demandées"
                             value={actionMessage}
                             onChange={(e) => setActionMessage(e.target.value)}
                             disabled={updatingStatus}
@@ -453,7 +490,10 @@ export function MessageriePanel() {
                           <ul className="fr-raw-list fr-text--sm fr-mb-2w">
                             {actionAttachments.map((piece, idx) => (
                               <li key={idx}>
-                                <span className="fr-icon-attachment-line fr-mr-1v" aria-hidden="true"></span>
+                                <span
+                                  className="fr-icon-attachment-line fr-mr-1v"
+                                  aria-hidden="true"
+                                ></span>
                                 {piece.nom || piece.name || `Fichier ${idx + 1}`}
                               </li>
                             ))}
@@ -461,7 +501,7 @@ export function MessageriePanel() {
                         )}
                         <div className="fr-upload-group">
                           <label className="fr-label" htmlFor="action-piece-jointe">
-                            Ajouter une piece jointe (optionnel)
+                            Ajouter une pièce jointe (optionnel)
                           </label>
                           <input
                             className="fr-upload"
@@ -471,7 +511,10 @@ export function MessageriePanel() {
                             onChange={handleActionFileUpload}
                             disabled={updatingStatus || uploadingFile}
                           />
-                          <p className="fr-hint-text">Utilisez cette option pour joindre un document lors d'une demande d'informations.</p>
+                          <p className="fr-hint-text">
+                            Utilisez cette option pour joindre un document lors d&apos;une demande
+                            d&apos;informations.
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -484,11 +527,15 @@ export function MessageriePanel() {
                         messages.map((message) => (
                           <div
                             key={message.id}
-                            className={`fr-mb-2w fr-p-2w ${message.expediteur_type === "admin" ? "fr-background-alt--blue-france" : "fr-background-alt--grey"}`}
+                            className={`fr-mb-2w fr-p-2w ${
+                              message.expediteur_type === "admin"
+                                ? "fr-background-alt--blue-france"
+                                : "fr-background-alt--grey"
+                            }`}
                             style={{
                               borderRadius: "8px",
                               marginLeft: message.expediteur_type === "admin" ? "20%" : "0",
-                              marginRight: message.expediteur_type === "client" ? "20%" : "0"
+                              marginRight: message.expediteur_type === "client" ? "20%" : "0",
                             }}
                           >
                             <p className="fr-text--bold fr-text--sm fr-mb-1v">
@@ -504,11 +551,11 @@ export function MessageriePanel() {
                       <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Zone de reponse */}
+                    {/* Zone de réponse */}
                     <form onSubmit={handleSendMessage}>
                       <div className="fr-input-group">
                         <label className="fr-label" htmlFor="new-message">
-                          Votre reponse
+                          Votre réponse
                         </label>
                         <textarea
                           className="fr-input"
@@ -526,7 +573,7 @@ export function MessageriePanel() {
                           className="fr-btn fr-icon-send-plane-line fr-btn--icon-left"
                           disabled={!newMessage.trim() || sendingMessage}
                         >
-                          {sendingMessage ? 'Envoi...' : 'Envoyer'}
+                          {sendingMessage ? "Envoi..." : "Envoyer"}
                         </button>
                         <button
                           type="button"
@@ -534,12 +581,12 @@ export function MessageriePanel() {
                           onClick={() => fileInputRef.current?.click()}
                           disabled={uploadingFile}
                         >
-                          {uploadingFile ? 'Upload...' : 'Joindre un fichier'}
+                          {uploadingFile ? "Téléversement..." : "Joindre un fichier"}
                         </button>
                         <input
                           ref={fileInputRef}
                           type="file"
-                          style={{ display: 'none' }}
+                          style={{ display: "none" }}
                           onChange={handleFileUpload}
                           accept="image/*,.pdf,.doc,.docx"
                         />
@@ -552,7 +599,7 @@ export function MessageriePanel() {
               <div className="fr-callout">
                 <h3 className="fr-callout__title">
                   <span className="fr-icon-chat-3-line fr-mr-1w" aria-hidden="true"></span>
-                  Selectionnez une conversation
+                  Sélectionnez une conversation
                 </h3>
                 <p>Cliquez sur une conversation dans la liste pour afficher les messages.</p>
               </div>

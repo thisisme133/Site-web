@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { FROM_EMAIL, isResendConfigured, resend } from '@/lib/resend-client'
 
 // GET - Récupérer les messages
 export async function GET(request: NextRequest) {
@@ -58,6 +59,51 @@ export async function POST(request: NextRequest) {
         { error: 'Erreur lors de l\'envoi du message' },
         { status: 500 }
       )
+    }
+
+    // Envoyer un email au client lorsqu'un administrateur répond
+    if (body.expediteur_type === 'admin') {
+      const { data: reservation, error: reservationError } = await supabaseAdmin
+        .from('reservations')
+        .select('client_email, client_nom, client_prenom, code, animal_nom')
+        .eq('id', body.reservation_id)
+        .single()
+
+      if (reservationError || !reservation) {
+        console.error('Reservation introuvable pour notification email:', reservationError)
+        return NextResponse.json(
+          { error: "Impossible d'envoyer l'email au client (réservation introuvable)" },
+          { status: 500 }
+        )
+      }
+
+      if (!isResendConfigured) {
+        return NextResponse.json(
+          { error: "Service d'email non configuré (RESEND_API_KEY manquant)" },
+          { status: 500 }
+        )
+      }
+
+      try {
+        await resend.emails.send({
+          from: FROM_EMAIL,
+          to: reservation.client_email,
+          subject: `Nouveau message concernant ${reservation.animal_nom}`,
+          html: `
+            <p>Bonjour ${reservation.client_prenom ? `${reservation.client_prenom} ${reservation.client_nom}` : reservation.client_nom},</p>
+            <p>Vous avez reçu un nouveau message dans votre espace Les Petits Bergers :</p>
+            <blockquote style="border-left: 4px solid #000091; padding: 12px; margin: 16px 0; color: #1e1e1e;">${body.contenu}</blockquote>
+            <p>Pour répondre ou suivre votre demande, utilisez votre code de réservation <strong>${reservation.code}</strong>.</p>
+            <p>À très vite,<br>L'équipe Les Petits Bergers</p>
+          `,
+        })
+      } catch (emailError) {
+        console.error("Echec d'envoi d'email messagerie:", emailError)
+        return NextResponse.json(
+          { error: "Le message a été enregistré mais l'email n'a pas pu être envoyé" },
+          { status: 500 }
+        )
+      }
     }
 
     return NextResponse.json(data, { status: 201 })

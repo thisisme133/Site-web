@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { resend, emailTemplates, FROM_EMAIL } from '@/lib/resend-client'
+import { resend, emailTemplates, FROM_EMAIL, isResendConfigured } from '@/lib/resend-client'
 
 // POST - Envoyer une facture par email
 export async function POST(request: NextRequest) {
   try {
     const { factureId } = await request.json()
+
+    if (!isResendConfigured) {
+      return NextResponse.json(
+        {
+          error:
+            "L'envoi d'email est désactivé. Ajoutez RESEND_API_KEY (et idéalement RESEND_FROM_EMAIL) dans votre .env.local.",
+        },
+        { status: 500 }
+      )
+    }
 
     if (!factureId) {
       return NextResponse.json(

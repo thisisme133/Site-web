@@ -107,6 +107,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 # Resend Configuration
 RESEND_API_KEY=re_123456789abcdefghijk
+RESEND_FROM_EMAIL=Les Petits Bergers <onboarding@resend.dev>
 
 # Application Configuration
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -114,6 +115,8 @@ ADMIN_EMAIL=votre-email@example.com
 ```
 
 3. **Changez `ADMIN_EMAIL`** par votre vraie adresse email (celle que vous utiliserez pour vous connecter en admin)
+
+ℹ️ **Astuce locale :** `RESEND_FROM_EMAIL` est configuré par défaut sur l'adresse de test `onboarding@resend.dev` afin de permettre l'envoi d'emails en développement sans domaine vérifié. En production, remplacez-la par une adresse de votre domaine validé dans Resend.
 
 ### 3.2 Configuration Vercel (pour le déploiement)
 

@@ -237,20 +237,20 @@ export async function PATCH(request: NextRequest) {
     }
 
     let statut = 'en_attente'
-    let defaultMessage = 'Mise a jour de votre demande'
+    let defaultMessage = 'Mise à jour de votre demande'
 
     switch (action) {
       case 'accepter':
         statut = 'confirmee'
-        defaultMessage = 'Votre demande est acceptee'
+        defaultMessage = 'Votre demande est acceptée'
         break
       case 'refuser':
         statut = 'annulee'
-        defaultMessage = 'Votre demande ne peut pas etre acceptee pour le moment'
+        defaultMessage = 'Votre demande ne peut pas être acceptée pour le moment'
         break
       case 'demander_infos':
         statut = 'en_attente'
-        defaultMessage = 'Nous avons besoin d'informations complementaires'
+        defaultMessage = 'Nous avons besoin d'informations complémentaires'
         break
     }
 

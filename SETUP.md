@@ -4,7 +4,7 @@ Ce guide vous accompagne pour configurer complètement l'application avec Supaba
 
 ## 📋 Prérequis
 
-- Node.js 18+ installé
+- Node.js 20.19 ou 22.12+ installé (évite les avertissements d'incompatibilité DSFR)
 - Un compte GitHub
 - Un compte Vercel (pour le déploiement)
 

@@ -2,14 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
 interface RouteParams {
-  params: {
-    id: string
-  }
+  params: { id: string }
 }
 
-export async function GET(_request: NextRequest, { params }: RouteParams) {
+export async function GET(
+  _request: NextRequest,
+  context: { params: RouteParams['params'] | Promise<RouteParams['params']> }
+) {
   try {
-    const { id } = params
+    const { id } = (await context.params) as RouteParams['params']
+
+    const uuidPattern = /^[0-9a-fA-F-]{36}$/
+
+    if (!id || !uuidPattern.test(id)) {
+      return NextResponse.json({ error: 'Identifiant invalide' }, { status: 400 })
+    }
 
     const { data, error } = await supabaseAdmin
       .from('chiens')

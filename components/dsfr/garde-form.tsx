@@ -34,6 +34,8 @@ export function GardeForm({ onBack }: GardeFormProps) {
   const [submitted, setSubmitted] = useState(false)
   const [modeRdv, setModeRdv] = useState(false)
   const [reservationCode, setReservationCode] = useState("")
+  const [apiError, setApiError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   const stepTitles = ["Pre-visite et vaccination", "Vos informations", "Informations sur l'animal", "Votre message"]
 
@@ -114,21 +116,83 @@ export function GardeForm({ onBack }: GardeFormProps) {
     setErrors({})
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (validateStep4()) {
-      const code = generateReservationCode()
-      setReservationCode(code)
+    if (!validateStep4()) return
+
+    setLoading(true)
+    setApiError(null)
+
+    try {
+      const response = await fetch("/api/reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "garde",
+          client_nom: formData.nom,
+          client_email: formData.email,
+          client_telephone: formData.telephone,
+          client_ville: formData.ville,
+          animal_nom: formData.animalNom,
+          animal_race: formData.animalType,
+          animal_age: `${formData.animalAge} ans`,
+          animal_poids: `${formData.animalPoids} kg`,
+          date_debut: formData.dateDebut,
+          date_fin: formData.dateFin,
+          visite_prealable: formData.preVisiteFaite,
+          form_data: formData,
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Impossible d'enregistrer votre demande")
+      }
+
+      setReservationCode(data.code || generateReservationCode())
       setSubmitted(true)
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Erreur inconnue")
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleRdvSubmit = (e: React.FormEvent) => {
+  const handleRdvSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (validateRdv()) {
-      const code = generateReservationCode()
-      setReservationCode(code)
+    if (!validateRdv()) return
+
+    setLoading(true)
+    setApiError(null)
+
+    try {
+      const response = await fetch("/api/reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "garde",
+          client_nom: formData.nom,
+          client_email: formData.email,
+          client_telephone: formData.telephone,
+          client_ville: formData.ville,
+          animal_nom: formData.animalNom,
+          animal_race: formData.animalType,
+          visite_prealable: true,
+          form_data: formData,
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Impossible d'enregistrer votre demande")
+      }
+
+      setReservationCode(data.code || generateReservationCode())
       setSubmitted(true)
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Erreur inconnue")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -425,6 +489,12 @@ export function GardeForm({ onBack }: GardeFormProps) {
               ))}
             </div>
           </div>
+
+          {apiError && (
+            <div className="fr-alert fr-alert--error fr-mb-3w">
+              <p>{apiError}</p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="fr-mt-4w">
             {step === 1 && (
@@ -777,8 +847,8 @@ export function GardeForm({ onBack }: GardeFormProps) {
                       </button>
                     </li>
                     <li>
-                      <button type="submit" className="fr-btn">
-                        Envoyer la demande
+                      <button type="submit" className="fr-btn" disabled={loading}>
+                        {loading ? "Envoi en cours..." : "Envoyer la demande"}
                       </button>
                     </li>
                   </ul>

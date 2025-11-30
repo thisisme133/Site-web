@@ -4,36 +4,60 @@
 import { useState, useEffect } from "react"
 import Script from "next/script"
 
-// Mock data - remplacer par des donnees reelles
-const mockGardesData = {
-  mensuel: { labels: ["S1", "S2", "S3", "S4"], values: [3, 5, 2, 4] },
-  trimestre: { labels: ["Mois 1", "Mois 2", "Mois 3"], values: [14, 18, 12] },
-  semestre: { labels: ["M1", "M2", "M3", "M4", "M5", "M6"], values: [14, 18, 12, 20, 15, 16] },
-  annuel: { labels: ["Jan", "Fev", "Mar", "Avr", "Mai", "Jun", "Jul", "Aou", "Sep", "Oct", "Nov", "Dec"], values: [12, 15, 14, 18, 20, 22, 25, 23, 19, 16, 14, 13] },
-}
-
-const mockChiensFrequents = [
-  { nom: "Max", race: "Berger Allemand", visites: 24 },
-  { nom: "Luna", race: "Golden Retriever", visites: 18 },
-  { nom: "Rex", race: "Labrador", visites: 15 },
-  { nom: "Bella", race: "Beagle", visites: 12 },
-  { nom: "Rocky", race: "Boxer", visites: 10 },
-]
-
-const mockStatsGlobales = {
-  totalGardes: 211,
-  totalActes: 47,
-  totalChiens: 35,
-  caAnnuel: 12450,
-}
-
 type Periode = "mensuel" | "trimestre" | "semestre" | "annuel"
+
+interface StatsData {
+  statsGlobales: {
+    totalGardes: number
+    totalActes: number
+    totalChiens: number
+    caAnnuel: number
+  }
+  gardesData: {
+    mensuel: { labels: string[]; values: number[] }
+    trimestre: { labels: string[]; values: number[] }
+    semestre: { labels: string[]; values: number[] }
+    annuel: { labels: string[]; values: number[] }
+  }
+  chiensFrequents: Array<{
+    nom: string
+    race: string
+    visites: number
+  }>
+}
 
 export function DashboardStats() {
   const [periode, setPeriode] = useState<Periode>("mensuel")
   const [chartsLoaded, setChartsLoaded] = useState(false)
+  const [stats, setStats] = useState<StatsData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const currentData = mockGardesData[periode]
+  // Charger les statistiques depuis l'API
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch('/api/stats')
+        if (!response.ok) {
+          throw new Error('Erreur lors du chargement des statistiques')
+        }
+        const data = await response.json()
+        setStats(data)
+        setError(null)
+      } catch (err) {
+        console.error('Erreur:', err)
+        setError('Impossible de charger les statistiques')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchStats()
+  }, [])
+
+  const currentData = stats?.gardesData[periode] || { labels: [], values: [] }
+  const statsGlobales = stats?.statsGlobales || { totalGardes: 0, totalActes: 0, totalChiens: 0, caAnnuel: 0 }
+  const chiensFrequents = stats?.chiensFrequents || []
 
   return (
     <>
@@ -53,6 +77,20 @@ export function DashboardStats() {
         </h1>
       </div>
 
+      {/* Message d'erreur */}
+      {error && (
+        <div className="fr-alert fr-alert--error fr-mb-4w">
+          <p>{error}</p>
+        </div>
+      )}
+
+      {/* Indicateur de chargement */}
+      {loading && (
+        <div className="fr-mb-4w" style={{ textAlign: 'center' }}>
+          <p>Chargement des statistiques...</p>
+        </div>
+      )}
+
       {/* Cartes statistiques */}
       <div className="fr-grid-row fr-grid-row--gutters fr-mb-4w">
         <div className="fr-col-6 fr-col-md-3">
@@ -63,7 +101,7 @@ export function DashboardStats() {
                   <span className="fr-icon-calendar-line fr-mr-1w" aria-hidden="true"></span>
                   Gardes
                 </h3>
-                <p className="fr-card__desc fr-text--bold fr-text--lg">{mockStatsGlobales.totalGardes}</p>
+                <p className="fr-card__desc fr-text--bold fr-text--lg">{statsGlobales.totalGardes}</p>
                 <p className="fr-card__detail">Total cette annee</p>
               </div>
             </div>
@@ -77,7 +115,7 @@ export function DashboardStats() {
                   <span className="fr-icon-stethoscope-line fr-mr-1w" aria-hidden="true"></span>
                   Actes
                 </h3>
-                <p className="fr-card__desc fr-text--bold fr-text--lg">{mockStatsGlobales.totalActes}</p>
+                <p className="fr-card__desc fr-text--bold fr-text--lg">{statsGlobales.totalActes}</p>
                 <p className="fr-card__detail">Comportementalisme</p>
               </div>
             </div>
@@ -91,7 +129,7 @@ export function DashboardStats() {
                   <span className="fr-icon-user-heart-line fr-mr-1w" aria-hidden="true"></span>
                   Chiens
                 </h3>
-                <p className="fr-card__desc fr-text--bold fr-text--lg">{mockStatsGlobales.totalChiens}</p>
+                <p className="fr-card__desc fr-text--bold fr-text--lg">{statsGlobales.totalChiens}</p>
                 <p className="fr-card__detail">Clients actifs</p>
               </div>
             </div>
@@ -105,7 +143,7 @@ export function DashboardStats() {
                   <span className="fr-icon-money-euro-circle-line fr-mr-1w" aria-hidden="true"></span>
                   CA
                 </h3>
-                <p className="fr-card__desc fr-text--bold fr-text--lg">{mockStatsGlobales.caAnnuel} EUR</p>
+                <p className="fr-card__desc fr-text--bold fr-text--lg">{statsGlobales.caAnnuel.toFixed(2)} EUR</p>
                 <p className="fr-card__detail">Chiffre d'affaires</p>
               </div>
             </div>
@@ -168,7 +206,7 @@ export function DashboardStats() {
               <span className="fr-icon-line-chart-line fr-mr-1w" aria-hidden="true"></span>
               Evolution des gardes
             </h3>
-            {chartsLoaded && (
+            {chartsLoaded && !loading && currentData.labels.length > 0 && (
               <bar-chart
                 x={`[${JSON.stringify(currentData.labels)}]`}
                 y={`[${JSON.stringify(currentData.values)}]`}
@@ -176,6 +214,9 @@ export function DashboardStats() {
                 selected-palette="categorical"
                 unit-tooltip="gardes"
               ></bar-chart>
+            )}
+            {!loading && currentData.labels.length === 0 && (
+              <p className="fr-text--sm">Aucune donnée disponible pour cette période</p>
             )}
             {/* Alternative textuelle pour accessibilite */}
             <details className="fr-accordion fr-mt-2w">
@@ -189,12 +230,18 @@ export function DashboardStats() {
                     </tr>
                   </thead>
                   <tbody>
-                    {currentData.labels.map((label, index) => (
-                      <tr key={label}>
-                        <td>{label}</td>
-                        <td>{currentData.values[index]}</td>
+                    {currentData.labels.length > 0 ? (
+                      currentData.labels.map((label, index) => (
+                        <tr key={label}>
+                          <td>{label}</td>
+                          <td>{currentData.values[index]}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={2}>Aucune donnée disponible</td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -222,32 +269,38 @@ export function DashboardStats() {
                   </tr>
                 </thead>
                 <tbody>
-                  {mockChiensFrequents.map((chien, index) => (
-                    <tr key={chien.nom}>
-                      <td>
-                        <span className="fr-badge fr-badge--info fr-badge--no-icon">
-                          {index + 1}
-                        </span>
-                      </td>
-                      <td>{chien.nom}</td>
-                      <td>{chien.race}</td>
-                      <td>
-                        <span className="fr-badge fr-badge--success fr-badge--no-icon">
-                          {chien.visites}
-                        </span>
-                      </td>
+                  {chiensFrequents.length > 0 ? (
+                    chiensFrequents.map((chien, index) => (
+                      <tr key={chien.nom}>
+                        <td>
+                          <span className="fr-badge fr-badge--info fr-badge--no-icon">
+                            {index + 1}
+                          </span>
+                        </td>
+                        <td>{chien.nom}</td>
+                        <td>{chien.race}</td>
+                        <td>
+                          <span className="fr-badge fr-badge--success fr-badge--no-icon">
+                            {chien.visites}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4}>Aucun chien enregistré</td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
 
-            {chartsLoaded && (
+            {chartsLoaded && !loading && chiensFrequents.length > 0 && (
               <div className="fr-mt-4w">
                 <pie-chart
-                  x={`[${JSON.stringify(mockChiensFrequents.map(c => c.nom))}]`}
-                  y={`[${JSON.stringify(mockChiensFrequents.map(c => c.visites))}]`}
-                  name={`${JSON.stringify(mockChiensFrequents.map(c => c.nom))}`}
+                  x={`[${JSON.stringify(chiensFrequents.map(c => c.nom))}]`}
+                  y={`[${JSON.stringify(chiensFrequents.map(c => c.visites))}]`}
+                  name={`${JSON.stringify(chiensFrequents.map(c => c.nom))}`}
                   unit-tooltip="visites"
                   selected-palette="categorical"
                 ></pie-chart>

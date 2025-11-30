@@ -1,11 +1,17 @@
 import { Resend } from 'resend'
 
+const RESEND_API_KEY = process.env.RESEND_API_KEY
+
 // Client Resend pour l'envoi d'emails
 // À utiliser uniquement dans les API routes côté serveur
-export const resend = new Resend(process.env.RESEND_API_KEY)
+export const resend = new Resend(RESEND_API_KEY)
 
-// Configuration de l'expéditeur
-export const FROM_EMAIL = 'Les Petits Bergers <noreply@lespetitsbergers.fr>'
+// Exposer l'état de la configuration pour éviter les appels silencieux en local
+export const isResendConfigured = Boolean(RESEND_API_KEY)
+
+// Configuration de l'expéditeur (fallback vers l'adresse onboarding de Resend pour les tests)
+export const FROM_EMAIL =
+  process.env.RESEND_FROM_EMAIL ?? 'Les Petits Bergers <onboarding@resend.dev>'
 
 // Templates d'emails
 export const emailTemplates = {

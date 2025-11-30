@@ -92,7 +92,7 @@ export function DashboardStats() {
 
   return (
     <>
-      <div className="fr-mb-4w">
+      <div className="fr-mb-3w">
         <h1 className="fr-h2">
           <span className="fr-icon-dashboard-3-line fr-mr-2w" aria-hidden="true"></span>
           Tableau de bord
@@ -114,7 +114,7 @@ export function DashboardStats() {
       )}
 
       {/* Cartes statistiques */}
-      <div className="fr-grid-row fr-grid-row--gutters fr-mb-4w">
+      <div className="fr-grid-row fr-grid-row--gutters fr-mb-2w">
         <div className="fr-col-6 fr-col-md-3">
           <div className="fr-card fr-card--no-border">
             <div className="fr-card__body">
@@ -174,7 +174,7 @@ export function DashboardStats() {
       </div>
 
       {/* Sélecteur de période */}
-      <fieldset className="fr-segmented fr-segmented--no-legend fr-mb-4w">
+      <fieldset className="fr-segmented fr-segmented--no-legend fr-mb-3w">
         <legend className="fr-segmented__legend">Période</legend>
         <div className="fr-segmented__elements">
           <div className="fr-segmented__element">
@@ -221,7 +221,7 @@ export function DashboardStats() {
       </fieldset>
 
       {/* Graphique des gardes */}
-      <div className="fr-card fr-card--no-border fr-mb-4w">
+      <div className="fr-card fr-card--no-border fr-mb-3w">
         <div className="fr-card__body">
           <div className="fr-card__content">
             <h3 className="fr-card__title">
@@ -250,7 +250,7 @@ export function DashboardStats() {
       </div>
 
       {/* Courbe des réservations par sexe */}
-      <div className="fr-card fr-card--no-border fr-mb-4w">
+      <div className="fr-card fr-card--no-border fr-mb-3w">
         <div className="fr-card__body">
           <div className="fr-card__content">
             <h3 className="fr-card__title">
@@ -279,7 +279,7 @@ export function DashboardStats() {
       </div>
 
       {/* Courbe des réservations par type */}
-      <div className="fr-card fr-card--no-border fr-mb-4w">
+      <div className="fr-card fr-card--no-border fr-mb-3w">
         <div className="fr-card__body">
           <div className="fr-card__content">
             <h3 className="fr-card__title">

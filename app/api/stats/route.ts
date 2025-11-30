@@ -20,6 +20,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Erreur' }, { status: 500 })
     }
 
+    // Récupérer les réservations pour les courbes
+    const { data: reservations, error: reservationsError } = await supabaseAdmin
+      .from('reservations')
+      .select('type, animal_sexe, created_at')
+      .gte('created_at', debutAnnee.toISOString())
+
+    if (reservationsError) {
+      console.error('Erreur reservations:', reservationsError)
+    }
+
     // Récupérer le nombre total de chiens actifs
     const { count: totalChiens, error: chiensError } = await supabaseAdmin
       .from('chiens')
@@ -44,12 +54,43 @@ export async function GET(request: NextRequest) {
       actes: 0,
     }))
 
+    const reservationsParSexe = Array.from({ length: 12 }, (_, i) => ({
+      mois: i,
+      nom: format(new Date(now.getFullYear(), i, 1), 'MMM'),
+      male: 0,
+      femelle: 0,
+    }))
+
+    const reservationsParType = Array.from({ length: 12 }, (_, i) => ({
+      mois: i,
+      nom: format(new Date(now.getFullYear(), i, 1), 'MMM'),
+      garde: 0,
+      comportementaliste: 0,
+    }))
+
     visites?.forEach((visite) => {
       const mois = new Date(visite.date_debut).getMonth()
       if (visite.type === 'garde') {
         statsParMois[mois].gardes++
       } else {
         statsParMois[mois].actes++
+      }
+    })
+
+    reservations?.forEach((resa) => {
+      const mois = new Date(resa.created_at).getMonth()
+      if (resa.animal_sexe === 'male') {
+        reservationsParSexe[mois].male++
+      }
+      if (resa.animal_sexe === 'femelle') {
+        reservationsParSexe[mois].femelle++
+      }
+
+      if (resa.type === 'garde') {
+        reservationsParType[mois].garde++
+      }
+      if (resa.type === 'comportementaliste') {
+        reservationsParType[mois].comportementaliste++
       }
     })
 
@@ -144,6 +185,16 @@ export async function GET(request: NextRequest) {
           labels: statsParMois.map((m) => m.nom),
           values: statsParMois.map((m) => m.gardes),
         },
+      },
+      reservationsParSexe: {
+        labels: reservationsParSexe.map((m) => m.nom),
+        male: reservationsParSexe.map((m) => m.male),
+        femelle: reservationsParSexe.map((m) => m.femelle),
+      },
+      reservationsParType: {
+        labels: reservationsParType.map((m) => m.nom),
+        garde: reservationsParType.map((m) => m.garde),
+        comportementaliste: reservationsParType.map((m) => m.comportementaliste),
       },
       chiensFrequents: chiensAvecVisites,
     })

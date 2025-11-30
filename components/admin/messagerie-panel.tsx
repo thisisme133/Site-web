@@ -1,7 +1,7 @@
 // components/admin/messagerie-panel.tsx
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef } from "react"
 
 interface Message {
   id: string
@@ -32,11 +32,18 @@ export function MessageriePanel() {
   const [messages, setMessages] = useState<Message[]>([])
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [newMessage, setNewMessage] = useState("")
+  const [filtreStatut, setFiltreStatut] = useState<string>('tous')
   const [loading, setLoading] = useState(true)
   const [sendingMessage, setSendingMessage] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null)
+  const [actionMessage, setActionMessage] = useState("")
+  const [actionAttachments, setActionAttachments] = useState<any[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const actionFileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Charger les conversations
@@ -85,6 +92,43 @@ export function MessageriePanel() {
       setMessages(data)
     } catch (err) {
       console.error('Erreur:', err)
+    }
+  }
+
+  const handleReservationAction = async (action: 'accepter' | 'refuser' | 'demander_infos') => {
+    if (!selectedConversation) return
+
+    try {
+      setUpdatingStatus(true)
+      setActionError(null)
+      const response = await fetch('/api/reservations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedConversation.reservationId,
+          action,
+          message: actionMessage || undefined,
+          piecesJointes: actionAttachments,
+        })
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Impossible de mettre à jour la réservation')
+      }
+
+      setActionSuccess('Réservation mise à jour')
+      setSelectedConversation(prev => prev ? { ...prev, statut: data.statut } : prev)
+      setActionMessage("")
+      setActionAttachments([])
+      await fetchMessages(selectedConversation.reservationId)
+      await fetchConversations()
+      setTimeout(() => setActionSuccess(null), 3000)
+    } catch (err) {
+      console.error('Erreur:', err)
+      setActionError(err instanceof Error ? err.message : 'Erreur inconnue')
+    } finally {
+      setUpdatingStatus(false)
     }
   }
 
@@ -175,11 +219,42 @@ export function MessageriePanel() {
       }
     } catch (err) {
       console.error('Erreur:', err)
-      alert('Impossible d\'uploader le fichier')
+      alert('Impossible de téléverser le fichier')
     } finally {
       setUploadingFile(false)
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  const handleActionFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setUploadingFile(true)
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/messages/upload', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de l\'upload du fichier')
+      }
+
+      const data = await response.json()
+      setActionAttachments((prev) => [...prev, data])
+    } catch (err) {
+      console.error('Erreur:', err)
+      setActionError('Impossible d\'ajouter la pièce jointe')
+    } finally {
+      setUploadingFile(false)
+      if (actionFileInputRef.current) {
+        actionFileInputRef.current.value = ''
       }
     }
   }
@@ -198,6 +273,22 @@ export function MessageriePanel() {
     }
   }
 
+  const renderStatutBadge = (statut: string) => {
+    switch (statut) {
+      case 'confirmee':
+        return <span className="fr-badge fr-badge--success fr-badge--no-icon">Confirmée</span>
+      case 'annulee':
+        return <span className="fr-badge fr-badge--error fr-badge--no-icon">Refusée</span>
+      case 'en_attente':
+      default:
+        return <span className="fr-badge fr-badge--info fr-badge--no-icon">En attente</span>
+    }
+  }
+
+  const conversationsFiltrees = conversations.filter((conv) =>
+    filtreStatut === 'tous' ? true : conv.statut === filtreStatut
+  )
+
   return (
     <div>
       <div className="fr-mb-4w">
@@ -206,7 +297,7 @@ export function MessageriePanel() {
           Messagerie
         </h1>
         <p className="fr-text--lead">
-          Gerez vos echanges avec les clients
+          Gérez vos échanges avec les clients et gardez la trace des décisions sur les réservations.
         </p>
       </div>
 
@@ -234,45 +325,57 @@ export function MessageriePanel() {
             <div className="fr-card fr-card--no-border">
               <div className="fr-card__body">
                 <div className="fr-card__content">
-                  <h3 className="fr-card__title">
-                    <span className="fr-icon-chat-3-line fr-mr-1w" aria-hidden="true"></span>
-                    Conversations ({conversations.length})
-                  </h3>
+                  <div className="fr-grid-row fr-grid-row--middle fr-grid-row--gutters fr-mb-2w">
+                    <div className="fr-col">
+                      <h3 className="fr-card__title fr-mb-0">
+                        <span className="fr-icon-chat-3-line fr-mr-1w" aria-hidden="true"></span>
+                        Conversations ({conversationsFiltrees.length}/{conversations.length})
+                      </h3>
+                    </div>
+                    <div className="fr-col-auto">
+                      <label className="fr-label" htmlFor="filtre-statut">Statut</label>
+                      <select
+                        id="filtre-statut"
+                        className="fr-select"
+                        value={filtreStatut}
+                        onChange={(e) => setFiltreStatut(e.target.value)}
+                      >
+                        <option value="tous">Tous</option>
+                        <option value="en_attente">En attente</option>
+                        <option value="confirmee">Confirmée</option>
+                        <option value="annulee">Refusée</option>
+                      </select>
+                    </div>
+                  </div>
 
-                  {conversations.length === 0 ? (
-                    <p className="fr-text--sm">Aucune conversation</p>
+                  {conversationsFiltrees.length === 0 ? (
+                    <p className="fr-text--sm">Aucune conversation dans ce statut</p>
                   ) : (
-                    <ul className="fr-raw-list">
-                      {conversations.map((conv) => (
+                    <ul className="fr-raw-list fr-p-0" style={{ maxHeight: '520px', overflowY: 'auto' }}>
+                      {conversationsFiltrees.map((conv) => (
                         <li key={conv.id} className="fr-mb-2w">
                           <button
-                            className={`fr-tile fr-tile--horizontal fr-enlarge-link ${selectedConversation?.id === conv.id ? "fr-tile--grey" : ""}`}
+                            className={`fr-btn fr-btn--tertiary-no-outline fr-btn--icon-left fr-btn--sm fr-btn--full ${selectedConversation?.id === conv.id ? 'fr-btn--secondary' : ''}`}
+                            style={{ justifyContent: 'flex-start', textAlign: 'left', whiteSpace: 'normal' }}
                             onClick={() => setSelectedConversation(conv)}
                           >
-                            <div className="fr-tile__body">
-                              <div className="fr-tile__content">
-                                <h4 className="fr-tile__title">
-                                  {conv.clientNom}
-                                  {conv.messagesNonLus > 0 && (
-                                    <span className="fr-badge fr-badge--info fr-badge--sm fr-ml-1w">
-                                      {conv.messagesNonLus}
-                                    </span>
-                                  )}
-                                </h4>
-                                <p className="fr-tile__detail">
-                                  <span className="fr-icon-user-heart-line fr-icon--sm fr-mr-1v" aria-hidden="true"></span>
-                                  {conv.animalNom}
-                                </p>
-                                <p className="fr-tile__desc fr-text--sm">
-                                  {conv.dernierMessage.length > 40
-                                    ? `${conv.dernierMessage.substring(0, 40)}...`
-                                    : conv.dernierMessage}
-                                </p>
-                                <p className="fr-tile__detail fr-text--xs">
-                                  {formatDate(conv.derniereActivite)}
-                                </p>
+                            <span className="fr-icon-user-heart-line" aria-hidden="true"></span>
+                            <span className="fr-ml-1w">
+                              <span className="fr-text--bold">{conv.clientNom}</span>
+                              <span className="fr-text--sm fr-text-mention--grey"> · {conv.animalNom}</span>
+                              <div className="fr-text--xs fr-mt-1v">
+                                {renderStatutBadge(conv.statut)}
+                                <span className="fr-ml-1w">{formatDate(conv.derniereActivite)}</span>
+                                {conv.messagesNonLus > 0 && (
+                                  <span className="fr-badge fr-badge--info fr-badge--sm fr-ml-1w">{conv.messagesNonLus}</span>
+                                )}
                               </div>
-                            </div>
+                              <div className="fr-text--sm fr-mt-1v" style={{ color: '#3a3a3a' }}>
+                                {conv.dernierMessage.length > 60
+                                  ? `${conv.dernierMessage.substring(0, 60)}...`
+                                  : conv.dernierMessage || 'Pas encore de message'}
+                              </div>
+                            </span>
                           </button>
                         </li>
                       ))}
@@ -299,6 +402,96 @@ export function MessageriePanel() {
                     </div>
 
                     <hr className="fr-hr" />
+
+                    <div className="fr-grid-row fr-grid-row--gutters fr-mb-3w">
+                      <div className="fr-col-12 fr-col-md-4">
+                        <p className="fr-text--sm fr-mb-1v">Statut</p>
+                        {renderStatutBadge(selectedConversation.statut)}
+                      </div>
+                      <div className="fr-col-12 fr-col-md-8">
+                        <div className="fr-btns-group fr-btns-group--inline fr-btns-group--right">
+                          <button
+                            type="button"
+                            className="fr-btn fr-icon-check-line fr-btn--icon-left"
+                            onClick={() => handleReservationAction('accepter')}
+                            disabled={updatingStatus}
+                          >
+                            Accepter
+                          </button>
+                          <button
+                            type="button"
+                            className="fr-btn fr-btn--secondary fr-icon-close-line fr-btn--icon-left"
+                            onClick={() => handleReservationAction('refuser')}
+                            disabled={updatingStatus}
+                          >
+                            Refuser
+                          </button>
+                          <button
+                            type="button"
+                            className="fr-btn fr-btn--tertiary-no-outline fr-icon-mail-line fr-btn--icon-left"
+                            onClick={() => handleReservationAction('demander_infos')}
+                            disabled={updatingStatus}
+                          >
+                            Infos complémentaires
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {actionError && (
+                      <div className="fr-alert fr-alert--error fr-mb-3w">
+                        <p>{actionError}</p>
+                      </div>
+                    )}
+
+                    {actionSuccess && (
+                      <div className="fr-alert fr-alert--success fr-mb-3w">
+                        <p>{actionSuccess}</p>
+                      </div>
+                    )}
+
+                    <div className="fr-grid-row fr-grid-row--gutters fr-mb-3w">
+                      <div className="fr-col-12 fr-col-md-8">
+                        <div className="fr-input-group">
+                          <label className="fr-label" htmlFor="action-message">
+                            Message au client (optionnel)
+                          </label>
+                          <textarea
+                            className="fr-input"
+                            id="action-message"
+                            rows={3}
+                            placeholder="Précisez les conditions ou les informations demandées"
+                            value={actionMessage}
+                            onChange={(e) => setActionMessage(e.target.value)}
+                            disabled={updatingStatus}
+                          />
+                        </div>
+                        {actionAttachments.length > 0 && (
+                          <ul className="fr-raw-list fr-text--sm fr-mb-2w">
+                            {actionAttachments.map((piece, idx) => (
+                              <li key={idx}>
+                                <span className="fr-icon-attachment-line fr-mr-1v" aria-hidden="true"></span>
+                                {piece.nom || piece.name || `Fichier ${idx + 1}`}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <div className="fr-upload-group">
+                          <label className="fr-label" htmlFor="action-piece-jointe">
+                            Ajouter une pièce jointe (optionnel)
+                          </label>
+                          <input
+                            className="fr-upload"
+                            type="file"
+                            id="action-piece-jointe"
+                            ref={actionFileInputRef}
+                            onChange={handleActionFileUpload}
+                            disabled={updatingStatus || uploadingFile}
+                          />
+                          <p className="fr-hint-text">Utilisez cette option pour joindre un document lors d'une demande d'informations.</p>
+                        </div>
+                      </div>
+                    </div>
 
                     {/* Messages */}
                     <div className="fr-mb-3w" style={{ maxHeight: "400px", overflowY: "auto" }}>
@@ -332,7 +525,7 @@ export function MessageriePanel() {
                     <form onSubmit={handleSendMessage}>
                       <div className="fr-input-group">
                         <label className="fr-label" htmlFor="new-message">
-                          Votre reponse
+                          Votre réponse
                         </label>
                         <textarea
                           className="fr-input"
@@ -358,7 +551,7 @@ export function MessageriePanel() {
                           onClick={() => fileInputRef.current?.click()}
                           disabled={uploadingFile}
                         >
-                          {uploadingFile ? 'Upload...' : 'Joindre un fichier'}
+                          {uploadingFile ? 'Téléversement...' : 'Joindre un fichier'}
                         </button>
                         <input
                           ref={fileInputRef}
@@ -376,7 +569,7 @@ export function MessageriePanel() {
               <div className="fr-callout">
                 <h3 className="fr-callout__title">
                   <span className="fr-icon-chat-3-line fr-mr-1w" aria-hidden="true"></span>
-                  Selectionnez une conversation
+                  Sélectionnez une conversation
                 </h3>
                 <p>Cliquez sur une conversation dans la liste pour afficher les messages.</p>
               </div>

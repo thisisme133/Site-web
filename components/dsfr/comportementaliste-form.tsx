@@ -34,6 +34,8 @@ export function ComportementalisteForm({ onBack }: ComportementalisteFormProps) 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitted, setSubmitted] = useState(false)
   const [reservationCode, setReservationCode] = useState("")
+  const [apiError, setApiError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   const stepTitles = ["Vos informations", "Type de consultation", "Votre message"]
 
@@ -88,12 +90,42 @@ export function ComportementalisteForm({ onBack }: ComportementalisteFormProps) 
     setErrors({})
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (validateStep3()) {
-      const code = generateReservationCode()
-      setReservationCode(code)
+    if (!validateStep3()) return
+
+    setApiError(null)
+    setLoading(true)
+
+    try {
+      const response = await fetch("/api/reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "comportementaliste",
+          client_nom: formData.nom,
+          client_email: formData.email,
+          client_telephone: formData.telephone,
+          client_ville: formData.ville,
+          animal_nom: formData.animalNom,
+          service_type: formData.service,
+          distance: distanceKm,
+          frais_deplacement: travelCost,
+          form_data: formData,
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Impossible d'enregistrer votre demande")
+      }
+
+      setReservationCode(data.code || generateReservationCode())
       setSubmitted(true)
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Erreur inconnue")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -171,6 +203,12 @@ export function ComportementalisteForm({ onBack }: ComportementalisteFormProps) 
               ))}
             </div>
           </div>
+
+          {apiError && (
+            <div className="fr-alert fr-alert--error fr-mb-3w">
+              <p>{apiError}</p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="fr-mt-4w">
             {step === 1 && (
@@ -410,8 +448,8 @@ export function ComportementalisteForm({ onBack }: ComportementalisteFormProps) 
                       </button>
                     </li>
                     <li>
-                      <button type="submit" className="fr-btn">
-                        Envoyer la demande
+                      <button type="submit" className="fr-btn" disabled={loading}>
+                        {loading ? "Envoi en cours..." : "Envoyer la demande"}
                       </button>
                     </li>
                   </ul>

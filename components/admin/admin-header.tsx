@@ -3,7 +3,12 @@
 
 import Link from "next/link"
 
-export function AdminHeader() {
+interface AdminHeaderProps {
+  userEmail?: string
+  onLogout?: () => void
+}
+
+export function AdminHeader({ userEmail, onLogout }: AdminHeaderProps) {
   return (
     <header role="banner" className="fr-header">
       <div className="fr-header__body">
@@ -33,8 +38,15 @@ export function AdminHeader() {
                       Retour au site
                     </Link>
                   </li>
+                  {userEmail && (
+                    <li>
+                      <span className="fr-btn fr-btn--secondary fr-icon-user-line fr-btn--icon-left">
+                        {userEmail}
+                      </span>
+                    </li>
+                  )}
                   <li>
-                    <button className="fr-btn fr-icon-logout-box-r-line">
+                    <button className="fr-btn fr-icon-logout-box-r-line" onClick={onLogout}>
                       Deconnexion
                     </button>
                   </li>

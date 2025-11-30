@@ -7,68 +7,42 @@ import { Header } from "@/components/dsfr/header"
 import { Footer } from "@/components/dsfr/footer"
 import { FollowUs } from "@/components/dsfr/follow-us"
 
-// Mock data for demo - in production this would come from a database
-const mockReservations: Record<
-  string,
-  {
-    code: string
-    type: "garde" | "comportementaliste"
-    nom: string
-    email: string
-    animalNom: string
-    createdAt: string
-    status: "pending" | "confirmed" | "cancelled"
-    messages: Array<{
-      id: string
-      content: string
-      sender: "client" | "admin"
-      createdAt: string
-    }>
-  }
-> = {
-  "ABCD1234-MAX": {
-    code: "ABCD1234",
-    type: "garde",
-    nom: "Jean Dupont",
-    email: "jean@example.com",
-    animalNom: "Max",
-    createdAt: "2025-11-28T10:00:00Z",
-    status: "confirmed",
-    messages: [
-      {
-        id: "1",
-        content: "Bonjour, votre demande de garde pour Max a bien ete recue.",
-        sender: "admin",
-        createdAt: "2025-11-28T10:30:00Z",
-      },
-      {
-        id: "2",
-        content: "Merci ! Est-ce que je peux amener Max le samedi matin ?",
-        sender: "client",
-        createdAt: "2025-11-28T14:00:00Z",
-      },
-      {
-        id: "3",
-        content: "Oui bien sur, le samedi matin a partir de 9h convient parfaitement.",
-        sender: "admin",
-        createdAt: "2025-11-28T15:00:00Z",
-      },
-    ],
-  },
+interface Reservation {
+  id: string
+  code: string
+  type: "garde" | "comportementaliste"
+  client_nom: string
+  client_email: string
+  animal_nom: string
+  created_at: string
+  statut: string
+}
+
+interface Message {
+  id: string
+  contenu: string
+  expediteur_type: "client" | "admin"
+  created_at: string
+  expediteur_nom: string
 }
 
 export default function ReservationPage() {
   const [code, setCode] = useState("")
   const [animalPrefix, setAnimalPrefix] = useState("")
   const [error, setError] = useState("")
-  const [reservation, setReservation] = useState<(typeof mockReservations)[string] | null>(null)
+  const [reservation, setReservation] = useState<Reservation | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [loading, setLoading] = useState(false)
   const [newMessage, setNewMessage] = useState("")
   const [messageSent, setMessageSent] = useState(false)
+  const [sending, setSending] = useState(false)
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setMessageSent(false)
+    setReservation(null)
+    setMessages([])
 
     if (!code || code.length < 4) {
       setError("Veuillez entrer un code de reservation valide")
@@ -80,45 +54,81 @@ export default function ReservationPage() {
       return
     }
 
-    // Look for reservation
-    const key = `${code.toUpperCase()}-${animalPrefix.toUpperCase()}`
-    const found = mockReservations[key]
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/reservations?code=${code.toUpperCase()}`)
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Aucune reservation trouvee")
+      }
 
-    if (found) {
-      setReservation(found)
-    } else {
-      setError("Aucune reservation trouvee avec ces informations. Verifiez votre code et le nom de votre animal.")
+      if (!data?.animal_nom || !data.animal_nom.toUpperCase().startsWith(animalPrefix.toUpperCase())) {
+        throw new Error("Aucune reservation trouvee avec ces informations. Verifiez votre code et le nom de votre animal.")
+      }
+
+      setReservation(data)
+      await fetchMessages(data.id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur inattendue")
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newMessage.trim()) return
+  const fetchMessages = async (reservationId: string) => {
+    try {
+      const resp = await fetch(`/api/messages?reservation_id=${reservationId}`)
+      if (!resp.ok) return
+      const data = await resp.json()
+      setMessages(data)
+    } catch (err) {
+      console.error("Erreur lors du chargement des messages", err)
+    }
+  }
 
-    // In production, this would send to an API
-    if (reservation) {
-      reservation.messages.push({
-        id: Date.now().toString(),
-        content: newMessage,
-        sender: "client",
-        createdAt: new Date().toISOString(),
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newMessage.trim() || !reservation) return
+
+    setSending(true)
+    try {
+      const response = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversation_id: `reservation-${reservation.id}`,
+          reservation_id: reservation.id,
+          expediteur_type: "client",
+          expediteur_nom: reservation.client_nom,
+          contenu: newMessage.trim(),
+        }),
       })
+
+      if (!response.ok) {
+        throw new Error("Impossible d'envoyer votre message")
+      }
+
       setNewMessage("")
       setMessageSent(true)
+      await fetchMessages(reservation.id)
       setTimeout(() => setMessageSent(false), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de l'envoi du message")
+    } finally {
+      setSending(false)
     }
   }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "confirmed":
+      case "confirmee":
         return <span className="fr-badge fr-badge--success fr-badge--no-icon">Confirmee</span>
-      case "pending":
+      case "en_attente":
         return <span className="fr-badge fr-badge--info fr-badge--no-icon">En attente</span>
-      case "cancelled":
+      case "annulee":
         return <span className="fr-badge fr-badge--error fr-badge--no-icon">Annulee</span>
       default:
-        return null
+        return <span className="fr-badge fr-badge--new fr-badge--no-icon">En cours</span>
     }
   }
 
@@ -186,8 +196,8 @@ export default function ReservationPage() {
                     </div>
                   )}
 
-                  <button type="submit" className="fr-btn fr-mt-4w">
-                    Acceder a ma reservation
+                  <button type="submit" className="fr-btn fr-mt-4w" disabled={loading}>
+                    {loading ? "Recherche..." : "Acceder a ma reservation"}
                   </button>
                 </form>
 
@@ -219,13 +229,13 @@ export default function ReservationPage() {
                             <strong>Type :</strong> {reservation.type === "garde" ? "Garde" : "Comportementaliste"}
                           </p>
                           <p className="fr-mb-1w">
-                            <strong>Animal :</strong> {reservation.animalNom}
+                            <strong>Animal :</strong> {reservation.animal_nom}
                           </p>
                           <p className="fr-mb-1w">
-                            <strong>Date :</strong> {formatDate(reservation.createdAt)}
+                            <strong>Date :</strong> {formatDate(reservation.created_at)}
                           </p>
                           <p className="fr-mb-2w">
-                            <strong>Statut :</strong> {getStatusBadge(reservation.status)}
+                            <strong>Statut :</strong> {getStatusBadge(reservation.statut)}
                           </p>
                         </div>
                       </div>
@@ -246,12 +256,12 @@ export default function ReservationPage() {
                       marginBottom: "1rem",
                     }}
                   >
-                    {reservation.messages.length === 0 ? (
+                    {messages.length === 0 ? (
                       <p className="fr-text--sm" style={{ color: "var(--text-mention-grey)" }}>
                         Aucun message pour le moment.
                       </p>
                     ) : (
-                      reservation.messages.map((msg) => (
+                      messages.map((msg) => (
                         <div
                           key={msg.id}
                           style={{
@@ -259,16 +269,18 @@ export default function ReservationPage() {
                             padding: "0.75rem",
                             borderRadius: "0.5rem",
                             backgroundColor:
-                              msg.sender === "admin" ? "var(--background-contrast-info)" : "var(--background-alt-grey)",
-                            marginLeft: msg.sender === "client" ? "2rem" : "0",
-                            marginRight: msg.sender === "admin" ? "2rem" : "0",
+                              msg.expediteur_type === "admin"
+                                ? "var(--background-contrast-info)"
+                                : "var(--background-alt-grey)",
+                            marginLeft: msg.expediteur_type === "client" ? "2rem" : "0",
+                            marginRight: msg.expediteur_type === "admin" ? "2rem" : "0",
                           }}
                         >
                           <p className="fr-text--xs fr-mb-1v" style={{ color: "var(--text-mention-grey)" }}>
-                            {msg.sender === "admin" ? "Les Petits Bergers" : "Vous"} - {formatDate(msg.createdAt)}
+                            {msg.expediteur_type === "admin" ? "Les Petits Bergers" : "Vous"} - {formatDate(msg.created_at)}
                           </p>
                           <p className="fr-text--sm" style={{ margin: 0 }}>
-                            {msg.content}
+                            {msg.contenu}
                           </p>
                         </div>
                       ))
@@ -295,8 +307,8 @@ export default function ReservationPage() {
                         placeholder="Ecrivez votre message..."
                       />
                     </div>
-                    <button type="submit" className="fr-btn fr-mt-2w">
-                      Envoyer
+                    <button type="submit" className="fr-btn fr-mt-2w" disabled={sending}>
+                      {sending ? "Envoi en cours..." : "Envoyer"}
                     </button>
                   </form>
                 </div>

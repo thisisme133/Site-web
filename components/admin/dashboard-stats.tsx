@@ -208,9 +208,9 @@ export function DashboardStats() {
             </h3>
             {chartsLoaded && !loading && currentData.labels.length > 0 && (
               <bar-chart
-                x={`[${JSON.stringify(currentData.labels)}]`}
-                y={`[${JSON.stringify(currentData.values)}]`}
-                name='["Nombre de gardes"]'
+                x={JSON.stringify(currentData.labels)}
+                y={JSON.stringify(currentData.values)}
+                name={JSON.stringify(["Nombre de gardes"])}
                 selected-palette="categorical"
                 unit-tooltip="gardes"
               ></bar-chart>
@@ -298,9 +298,9 @@ export function DashboardStats() {
             {chartsLoaded && !loading && chiensFrequents.length > 0 && (
               <div className="fr-mt-4w">
                 <pie-chart
-                  x={`[${JSON.stringify(chiensFrequents.map(c => c.nom))}]`}
-                  y={`[${JSON.stringify(chiensFrequents.map(c => c.visites))}]`}
-                  name={`${JSON.stringify(chiensFrequents.map(c => c.nom))}`}
+                  x={JSON.stringify(chiensFrequents.map((c) => c.nom))}
+                  y={JSON.stringify(chiensFrequents.map((c) => c.visites))}
+                  name={JSON.stringify(chiensFrequents.map((c) => c.nom))}
                   unit-tooltip="visites"
                   selected-palette="categorical"
                 ></pie-chart>

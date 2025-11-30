@@ -296,37 +296,6 @@ export function MessageriePanel() {
     }
   }
 
-  const handleActionFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    try {
-      setUploadingFile(true)
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const response = await fetch('/api/messages/upload', {
-        method: 'POST',
-        body: formData
-      })
-
-      if (!response.ok) {
-        throw new Error('Erreur lors de l\'upload du fichier')
-      }
-
-      const data = await response.json()
-      setActionAttachments((prev) => [...prev, data])
-    } catch (err) {
-      console.error('Erreur:', err)
-      setActionError('Impossible d\'ajouter la pièce jointe')
-    } finally {
-      setUploadingFile(false)
-      if (actionFileInputRef.current) {
-        actionFileInputRef.current.value = ''
-      }
-    }
-  }
-
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
     const now = new Date()
